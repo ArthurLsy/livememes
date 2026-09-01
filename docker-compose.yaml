@@ -1,0 +1,67 @@
+# Deploiement du backend LiveMemes.
+#
+# Coolify : "New Resource" > "Docker Compose", pointe sur ce fichier. Renseigne
+# les variables dans l'onglet Environment Variables, et attache un domaine au
+# service `server` (port 8787).
+#
+# En local : docker compose -f docker-compose.yaml -f docker-compose.local.yaml up
+# (le second fichier publie le port sur l'hote, inutile derriere un proxy).
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+
+    environment:
+      # --- Obligatoire ---
+      DISCORD_TOKEN: ${DISCORD_TOKEN:?DISCORD_TOKEN est requis}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:?DISCORD_CLIENT_ID est requis}
+
+      # URL publique du backend, telle que les overlays la joignent. Mets ici
+      # exactement le domaine attache au service dans Coolify, https compris.
+      # Une erreur ici = les memes ne s'affichent chez personne.
+      PUBLIC_URL: ${PUBLIC_URL:?PUBLIC_URL est requis (https://ton-domaine)}
+
+      # --- Optionnel ---
+      # Deploie les slash commands a chaque demarrage. Mets true pour le premier
+      # deploiement, puis repasse a false : Discord limite la creation de
+      # commandes globales a 200/jour et un conteneur qui boucle epuiserait le quota.
+      DEPLOY_COMMANDS_ON_BOOT: ${DEPLOY_COMMANDS_ON_BOOT:-false}
+      # Limite les commandes a un seul serveur Discord (propagation instantanee).
+      DISCORD_DEV_GUILD_ID: ${DISCORD_DEV_GUILD_ID:-}
+      # Active /meme gif.
+      TENOR_API_KEY: ${TENOR_API_KEY:-}
+      TENOR_CLIENT_KEY: ${TENOR_CLIENT_KEY:-livememes}
+
+      MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-26214400}
+      MEDIA_TTL_HOURS: ${MEDIA_TTL_HOURS:-24}
+      DROP_DEFAULT_DURATION_MS: ${DROP_DEFAULT_DURATION_MS:-6000}
+      DROP_MAX_DURATION_MS: ${DROP_MAX_DURATION_MS:-20000}
+      DROP_COOLDOWN_MS: ${DROP_COOLDOWN_MS:-8000}
+
+    # HTTP et WebSocket partagent le meme port : le proxy n'a qu'une route a gerer.
+    # Volontairement `expose` et non `ports` : publier 8787 sur l'hote rendrait le
+    # backend joignable en clair, hors du TLS gere par le proxy.
+    expose:
+      - '8787'
+
+    volumes:
+      # Indispensable. Sans ce volume, la base des appareils lies est perdue a
+      # chaque redeploiement et tout le monde doit refaire /livememes link.
+      - livememes-data:/app/data
+
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - '-e'
+        - "fetch('http://127.0.0.1:8787/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  livememes-data:

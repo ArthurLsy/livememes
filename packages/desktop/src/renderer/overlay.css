@@ -1,0 +1,109 @@
+/* L'overlay recouvre l'ecran entier mais reste invisible et traversant. */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  /* Redondant avec setIgnoreMouseEvents, mais protege si un clic passe. */
+  pointer-events: none;
+  user-select: none;
+  cursor: default;
+}
+
+#stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.drop {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  /* Le point d'ancrage est pose en JS via --x/--y ; translate recentre dessus. */
+  left: var(--x);
+  top: var(--y);
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+  animation: drop-in 420ms cubic-bezier(0.16, 1.24, 0.4, 1) both;
+}
+
+.drop.leaving {
+  animation: drop-out 320ms cubic-bezier(0.55, 0, 0.85, 0.35) both;
+}
+
+.drop__media {
+  display: block;
+  max-width: 92vw;
+  height: var(--h);
+  width: auto;
+  object-fit: contain;
+  border-radius: 14px;
+  /* Une ombre large detache le meme de n'importe quel fond. */
+  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.55));
+}
+
+.drop__caption {
+  max-width: 80vw;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: rgba(12, 13, 18, 0.82);
+  color: #fff;
+  font: 600 clamp(15px, 1.6vh, 22px) / 1.35 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  text-align: center;
+  text-wrap: balance;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.drop__author {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px 5px 5px;
+  border-radius: 999px;
+  background: rgba(12, 13, 18, 0.72);
+  color: rgba(255, 255, 255, 0.88);
+  font: 500 clamp(11px, 1.15vh, 15px) / 1 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  backdrop-filter: blur(12px);
+}
+
+.drop__avatar {
+  width: 1.7em;
+  height: 1.7em;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Entree : le meme tombe du haut avec un rebond court. */
+@keyframes drop-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 90px)) scale(0.82) rotate(-3deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+}
+
+@keyframes drop-out {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 50px)) scale(0.9);
+  }
+}

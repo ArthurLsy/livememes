@@ -1,0 +1,27 @@
+{
+  "name": "livememes",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Balance des memes en plein ecran chez tous les membres d'un salon vocal Discord.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "workspaces": [
+    "packages/shared",
+    "packages/server",
+    "packages/desktop"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @livememes/server",
+    "dev:desktop": "npm run dev --workspace @livememes/desktop",
+    "commands:deploy": "npm run commands:deploy --workspace @livememes/server",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dist:desktop": "npm run dist --workspace @livememes/desktop",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
