@@ -1,6 +1,6 @@
 {
   "name": "@livememes/desktop",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-beta.1",
   "private": true,
   "description": "Overlay LiveMemes",
   "author": "ArthurLsy",
@@ -37,6 +37,10 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true
     },
-    "linux": { "target": ["AppImage"], "category": "Utility" }
+    "linux": {
+      "target": ["AppImage"],
+      "category": "Utility",
+      "maintainer": "ArthurLsy <ArthurLsy@users.noreply.github.com>"
+    }
   }
 }

@@ -1,6 +1,6 @@
 name: release
 
-# Se declenche sur un tag v* (ex. v0.1.0-alpha.1). En manuel, lance le workflow
+# Se declenche sur un tag v* (ex. v0.1.0-beta.1). En manuel, lance le workflow
 # en choisissant le tag comme ref, pas une branche : le nom du tag sert de version.
 on:
   push:
@@ -25,10 +25,47 @@ jobs:
       # Les tests posent eux-memes leurs process.env : aucun secret n'est requis.
       - run: npm test
 
-  windows:
-    name: build Windows
+  # La release est creee une seule fois, avant les builds : trois jobs qui
+  # tentent de la creer en parallele s'ecraseraient les uns les autres.
+  create-release:
+    name: creer la release
     needs: verify
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Creer la prerelease si absente
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "release $TAG deja presente, les binaires seront remplaces"
+          else
+            gh release create "$TAG" \
+              --prerelease \
+              --title "LiveMemes $TAG" \
+              --notes-file .github/RELEASE_NOTES.md
+          fi
+
+  build:
+    name: build ${{ matrix.os }}
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Un echec sur une plateforme ne doit pas priver les autres de binaires.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: ''
+          # Les runners macOS sont arm64 : sans les deux arches, aucun binaire
+          # pour les Mac Intel.
+          - os: macos-latest
+            args: '--x64 --arm64'
+          - os: ubuntu-latest
+            args: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -43,54 +80,27 @@ jobs:
         working-directory: packages/desktop
         run: npm run build
 
-      - name: Packager (nsis + zip)
+      # Sans drapeau de plateforme, electron-builder cible celle du runner.
+      - name: Packager
         working-directory: packages/desktop
-        run: npx electron-builder --win --publish never
+        run: npx electron-builder --publish never ${{ matrix.args }}
 
-      # Filet de securite : les binaires restent recuperables meme si la
-      # publication de la release echoue.
-      - name: Archiver les binaires
-        uses: actions/upload-artifact@v4
-        with:
-          name: livememes-windows
-          path: |
-            packages/desktop/release/*.exe
-            packages/desktop/release/*.zip
-
-      - name: Publier la release
+      - name: Publier les binaires
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG="${GITHUB_REF_NAME}"
-          cat > notes.md <<'EOF'
-          Build alpha Windows, non signee : SmartScreen affichera
-          "Windows a protege votre ordinateur" au premier lancement
-          (Informations complementaires -> Executer quand meme).
-
-          **Installer** : `LiveMemes-*-win-x64.exe` (installeur NSIS, par utilisateur).
-          **Sans installer** : `LiveMemes-*-win-x64.zip`, decompresse et lance `LiveMemes.exe`.
-
-          L'app vit dans la zone de notification, pas dans la barre des taches.
-
-          **Il faut un backend joignable depuis le PC Windows.** Dans Reglages,
-          le champ Serveur doit pointer sur l'URL publique du backend
-          (`http://<ip-lan>:8787` sur le meme reseau, ou l'URL du tunnel).
-          `localhost` ne marche que si le backend tourne sur ce PC. Cette meme URL
-          doit etre celle de `PUBLIC_URL` cote backend, sinon les commandes
-          repondent dans Discord mais aucun meme ne s'affiche.
-
-          Ensuite : `/livememes link` dans Discord, colle le code, puis `/meme`
-          depuis un salon vocal.
-          EOF
-
-          FILES=(packages/desktop/release/*.exe packages/desktop/release/*.zip)
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${FILES[@]}" --clobber
-          else
-            gh release create "$TAG" "${FILES[@]}" \
-              --prerelease \
-              --title "LiveMemes $TAG" \
-              --notes-file notes.md
+          shopt -s nullglob
+          FILES=(
+            packages/desktop/release/*.exe
+            packages/desktop/release/*.dmg
+            packages/desktop/release/*.AppImage
+            packages/desktop/release/*.zip
+          )
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "aucun binaire produit" >&2
+            exit 1
           fi
+          printf 'a publier : %s\n' "${FILES[@]}"
+          gh release upload "${GITHUB_REF_NAME}" "${FILES[@]}" --clobber
