@@ -49,12 +49,6 @@ export const config = {
     publicUrl: (process.env.PUBLIC_URL ?? `http://localhost:${int('PORT', 8787)}`).replace(/\/$/, ''),
   },
 
-  tenor: {
-    apiKey: process.env.TENOR_API_KEY || null,
-    /** Identifiant client exige par l'API Tenor v2. */
-    clientKey: process.env.TENOR_CLIENT_KEY || 'livememes',
-  },
-
   media: {
     /** Au-dela, on refuse le meme : l'overlay doit rester instantane. */
     maxBytes: int('MEDIA_MAX_BYTES', 25 * 1024 * 1024),

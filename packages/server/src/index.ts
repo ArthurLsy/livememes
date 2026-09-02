@@ -18,9 +18,6 @@ server.listen(config.http.port, () => {
   if (config.http.publicUrl.includes('localhost')) {
     console.log('[http] PUBLIC_URL pointe sur localhost : seuls les overlays de cette machine verront les medias.');
   }
-  if (!config.tenor.apiKey) {
-    console.log('[tenor] TENOR_API_KEY absente : /meme gif est desactive.');
-  }
 });
 
 if (config.discord.deployOnBoot) {

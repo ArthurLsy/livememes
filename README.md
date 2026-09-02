@@ -14,7 +14,7 @@ de MemeDrop.
 ## Comment ca marche
 
 1. Le bot regarde dans **quel salon vocal** se trouve l'auteur de la commande.
-2. Il resout le meme (Tenor, URL ou piece jointe) et le **telecharge sur le backend** —
+2. Il resout le meme (URL ou piece jointe) et le **telecharge sur le backend** —
    les URLs du CDN Discord expirent, on ne peut pas les envoyer telles quelles.
 3. Il pousse le meme via WebSocket a **tous les membres du vocal** qui ont l'overlay
    ouvert et lie a leur compte Discord.
@@ -49,12 +49,6 @@ Aucun intent privilegie n'est necessaire : le bot utilise `Guilds` et
 
 Mets `DISCORD_DEV_GUILD_ID` pendant le developpement : les commandes apparaissent
 instantanement sur ce serveur, au lieu d'attendre jusqu'a une heure en global.
-
-### Tenor (optionnel, pour `/meme gif`)
-
-Cree une cle sur [Google Cloud Console](https://console.cloud.google.com) en activant
-l'API **Tenor**, puis renseigne `TENOR_API_KEY`. Sans cle, `/meme gif` est desactive ;
-`/meme url` et `/meme fichier` continuent de marcher.
 
 ## Lancer
 
@@ -128,7 +122,6 @@ Le cache media grossit avec l'usage et se purge tout seul selon
 
 | Sous-commande | Ce que ca fait |
 | --- | --- |
-| `/meme gif recherche:<texte>` | Cherche sur Tenor, avec autocompletion Discord |
 | `/meme url url:<lien>` | Une image, un GIF ou une video depuis une URL |
 | `/meme fichier fichier:<upload>` | Un fichier depuis ton disque |
 

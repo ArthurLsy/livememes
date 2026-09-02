@@ -31,10 +31,6 @@ services:
       DEPLOY_COMMANDS_ON_BOOT: ${DEPLOY_COMMANDS_ON_BOOT:-false}
       # Limite les commandes a un seul serveur Discord (propagation instantanee).
       DISCORD_DEV_GUILD_ID: ${DISCORD_DEV_GUILD_ID:-}
-      # Active /meme gif.
-      TENOR_API_KEY: ${TENOR_API_KEY:-}
-      TENOR_CLIENT_KEY: ${TENOR_CLIENT_KEY:-livememes}
-
       # Role requis pour envoyer et recevoir des memes. Vide = tout le monde.
       DROP_ROLE_ID: ${DROP_ROLE_ID:-}
 
