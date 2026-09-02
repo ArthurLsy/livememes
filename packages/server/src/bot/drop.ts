@@ -20,18 +20,40 @@ export function startCooldown(userId: string): void {
   cooldowns.set(userId, Date.now() + config.drops.cooldownMs);
 }
 
+/** Auteur de la commande, resolu en membre de la guilde. Null hors guilde. */
+export async function resolveMember(
+  interaction: ChatInputCommandInteraction,
+): Promise<GuildMember | null> {
+  if (!interaction.guild) return null;
+  return interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+}
+
 /** Salon vocal ou se trouve l'auteur de la commande, null s'il n'est dans aucun. */
 export async function resolveVoiceChannel(
   interaction: ChatInputCommandInteraction,
 ): Promise<VoiceBasedChannel | null> {
-  if (!interaction.guild) return null;
-  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
-  return member?.voice.channel ?? null;
+  return (await resolveMember(interaction))?.voice.channel ?? null;
 }
 
-/** Membres humains presents dans le salon vocal. */
-export function audienceOf(channel: VoiceBasedChannel): GuildMember[] {
+/**
+ * Eligibilite aux memes, envoi comme reception.
+ *
+ * Les roles arrivent dans les payloads de voice state, donc aucun intent
+ * privilegie n'est necessaire pour ce test.
+ */
+export function hasDropRole(member: GuildMember): boolean {
+  if (!config.drops.roleId) return true;
+  return member.roles.cache.has(config.drops.roleId);
+}
+
+/** Membres humains presents dans le salon vocal, role requis ou non. */
+export function humansOf(channel: VoiceBasedChannel): GuildMember[] {
   return [...channel.members.values()].filter((member) => !member.user.bot);
+}
+
+/** Membres du salon vocal qui ont le droit de recevoir un meme. */
+export function audienceOf(channel: VoiceBasedChannel): GuildMember[] {
+  return humansOf(channel).filter(hasDropRole);
 }
 
 export interface BuildOptions {

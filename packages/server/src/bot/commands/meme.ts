@@ -1,6 +1,7 @@
 import {
   InteractionContextType,
   MessageFlags,
+  roleMention,
   SlashCommandBuilder,
   SlashCommandSubcommandBuilder,
   type AutocompleteInteraction,
@@ -10,7 +11,7 @@ import { MEME_POSITIONS, type MemePosition, type MemeSize } from '@livememes/sha
 import { config } from '../../config.ts';
 import { MediaError } from '../../media/cache.ts';
 import * as tenor from '../../media/tenor.ts';
-import { cooldownRemaining, deliver, resolveVoiceChannel, startCooldown } from '../drop.ts';
+import { cooldownRemaining, deliver, hasDropRole, resolveMember, startCooldown } from '../drop.ts';
 
 /** Options d'affichage communes aux trois sous-commandes. */
 function withDisplayOptions(sub: SlashCommandSubcommandBuilder): SlashCommandSubcommandBuilder {
@@ -183,7 +184,26 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  const channel = await resolveVoiceChannel(interaction);
+  const member = await resolveMember(interaction);
+  if (!member) {
+    await interaction.reply({
+      content: 'Impossible de te trouver sur ce serveur. Reessaie dans un instant.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  // Le meme role conditionne l'envoi et la reception : sans lui, inutile d'aller
+  // plus loin, l'audience serait vide de toute facon.
+  if (!hasDropRole(member)) {
+    await interaction.reply({
+      content: `Il te faut le role ${roleMention(config.drops.roleId!)} pour balancer un meme.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const channel = member.voice.channel;
   if (!channel) {
     await interaction.reply({
       content: "Tu dois etre dans un salon vocal pour balancer un meme.",

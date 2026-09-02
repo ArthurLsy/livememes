@@ -135,6 +135,13 @@ Le cache media grossit avec l'usage et se purge tout seul selon
 Options communes : `texte` (legende), `duree` (secondes), `taille`
 (petit/moyen/grand/plein ecran), `position` (centre, coins, aleatoire), `volume`.
 
+### Restreindre a un role
+
+`DROP_ROLE_ID` limite les memes aux porteurs d'un role, **a l'envoi comme a la
+reception** : sans le role, `/meme` est refuse et rien ne s'affiche a l'ecran, meme
+en etant dans le bon salon vocal. Non definie, la variable laisse tout le monde
+eligible. `/livememes status` indique combien de membres du vocal sont exclus.
+
 ### `/livememes` — gerer ton overlay
 
 | Sous-commande | Ce que ca fait |
@@ -172,8 +179,7 @@ hors ligne) et le service de medias, sans avoir besoin d'un vrai bot Discord.
 - **Wayland (Linux)** : le positionnement des fenetres always-on-top est a la main
   du compositeur. X11 fonctionne de maniere fiable.
 - **Pas de moderation automatique** du contenu. Le cooldown (`DROP_COOLDOWN_MS`),
-  `/livememes mute` et `/livememes clear` sont les garde-fous fournis. Sur un serveur
-  public, restreins `/meme` par role dans les reglages d'integration Discord.
+  `DROP_ROLE_ID`, `/livememes mute` et `/livememes clear` sont les garde-fous fournis.
 - Les tokens d'appareil sont stockes en clair dans la base SQLite du backend et dans
   `settings.json` cote client. Suffisant pour un serveur entre amis ; a durcir si tu
   ouvres le service.

@@ -68,6 +68,12 @@ export const config = {
     maxDurationMs: int('DROP_MAX_DURATION_MS', 20_000),
     /** Delai minimum entre deux drops d'un meme utilisateur. */
     cooldownMs: int('DROP_COOLDOWN_MS', 8_000),
+    /**
+     * Role requis pour envoyer ET recevoir des memes. Non defini, tout le monde
+     * est eligible. Filtre a la fois /meme et l'audience du salon vocal : un
+     * membre sans le role ne peut pas balancer et ne voit rien s'afficher.
+     */
+    roleId: process.env.DROP_ROLE_ID || null,
   },
 
   pairing: {

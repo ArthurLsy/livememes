@@ -15,7 +15,7 @@ import {
   unlinkAll,
 } from '../../store/devices.ts';
 import * as hub from '../../realtime/hub.ts';
-import { audienceOf, resolveVoiceChannel } from '../drop.ts';
+import { audienceOf, humansOf, resolveVoiceChannel } from '../drop.ts';
 
 export const data = new SlashCommandBuilder()
   .setName('livememes')
@@ -187,6 +187,12 @@ async function status(interaction: ChatInputCommandInteraction): Promise<void> {
   });
 
   const ready = audience.filter((member) => !isMuted(member.id) && hub.isOnline(member.id)).length;
+
+  // Sans cette ligne, un membre filtre par le role donnerait l'impression d'un bug.
+  const excluded = humansOf(channel).length - audience.length;
+  if (excluded > 0) {
+    lines.push(`${excluded} membre(s) du vocal n'ont pas le role requis et ne recoivent rien.`);
+  }
 
   await interaction.reply({
     flags: MessageFlags.Ephemeral,
