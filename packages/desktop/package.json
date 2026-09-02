@@ -1,8 +1,10 @@
 {
   "name": "@livememes/desktop",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "description": "Overlay LiveMemes",
+  "author": "ArthurLsy",
+  "repository": "https://github.com/ArthurLsy/livememes",
   "main": "dist/main/index.cjs",
   "scripts": {
     "build": "node build.mjs",
@@ -11,25 +13,30 @@
     "dist": "npm run build && electron-builder",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "@livememes/shared": "*",
-    "ws": "^8.21.3"
-  },
   "devDependencies": {
+    "@livememes/shared": "*",
     "@types/node": "^24.10.1",
     "@types/ws": "^8.18.1",
     "electron": "^44.1.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.27.2",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "ws": "^8.21.3"
   },
   "build": {
     "appId": "app.livememes.overlay",
     "productName": "LiveMemes",
     "files": ["dist/**/*", "assets/**/*"],
     "directories": { "output": "release" },
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "npmRebuild": false,
     "mac": { "category": "public.app-category.entertainment", "target": ["dmg", "zip"] },
-    "win": { "target": ["nsis"] },
+    "win": { "target": ["nsis", "zip"] },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true
+    },
     "linux": { "target": ["AppImage"], "category": "Utility" }
   }
 }
