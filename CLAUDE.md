@@ -8,6 +8,14 @@ Tout le depot est en francais **sans accents** (ASCII pur) : commentaires, logs,
 messages d'erreur, reponses du bot, textes de l'UI desktop. Garde cette convention
 dans tout code ajoute.
 
+## Reponses du bot
+
+**Toutes** les reponses aux interactions sont ephemeres (`MessageFlags.Ephemeral`),
+sans exception : le bot ne poste jamais rien de visible dans un salon textuel. Le
+meme s'affiche sur les overlays, c'est le seul retour public. Quand une commande
+differe sa reponse, le flag se pose sur le `deferReply` — la visibilite est figee
+a ce moment-la et `editReply` ne peut plus la changer.
+
 ## Commandes
 
 ```bash

@@ -165,7 +165,10 @@ async function clear(interaction: ChatInputCommandInteraction): Promise<void> {
     screens += hub.sendToUser(member.id, { t: 'clear', dropId: null });
   }
 
-  await interaction.reply(`Memes effaces sur ${screens} ecran(s) dans ${channel}.`);
+  await interaction.reply({
+    content: `Memes effaces sur ${screens} ecran(s) dans ${channel}.`,
+    flags: MessageFlags.Ephemeral,
+  });
 }
 
 async function status(interaction: ChatInputCommandInteraction): Promise<void> {

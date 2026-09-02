@@ -149,7 +149,10 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
-  await interaction.deferReply();
+  // Ephemere des le defer : la visibilite d'une reponse est figee ici, un
+  // editReply ne peut plus la changer. Le meme s'affiche sur les overlays,
+  // le salon textuel n'a pas a etre pollue.
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   let sourceUrl: string;
   try {
