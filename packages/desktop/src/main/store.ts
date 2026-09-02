@@ -2,8 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 
+/**
+ * Backend joint par l'overlay. Volontairement hors de `Settings` : l'utilisateur
+ * n'a pas a le saisir, et le garder dans settings.json figerait l'ancienne valeur
+ * sur les installations existantes. LIVEMEMES_SERVER reste la porte de sortie
+ * pour le developpement local.
+ */
+export const SERVER_URL = process.env.LIVEMEMES_SERVER ?? 'https://meme.gowey.fr';
+
 export interface Settings {
-  serverUrl: string;
   token: string | null;
   user: { id: string; username: string; avatarUrl: string | null } | null;
   /** Volume applique par-dessus celui demande par l'expediteur, 0-1. */
@@ -15,7 +22,6 @@ export interface Settings {
 }
 
 const DEFAULTS: Settings = {
-  serverUrl: process.env.LIVEMEMES_SERVER ?? 'http://localhost:8787',
   token: null,
   user: null,
   volume: 0.7,

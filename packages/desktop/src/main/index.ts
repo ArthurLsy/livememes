@@ -29,7 +29,7 @@ let quitting = false;
 function appState() {
   const settings = store.get();
   return {
-    serverUrl: settings.serverUrl,
+    serverUrl: store.SERVER_URL,
     linked: settings.token !== null,
     user: settings.user,
     volume: settings.volume,
@@ -110,10 +110,10 @@ function setMuted(muted: boolean): void {
 /* Appairage                                                                  */
 /* -------------------------------------------------------------------------- */
 
-async function pair(code: string, serverUrl: string): Promise<{ ok: true } | { ok: false; error: string }> {
+async function pair(code: string): Promise<{ ok: true } | { ok: false; error: string }> {
   let http: string;
   try {
-    ({ http } = store.endpoints(serverUrl));
+    ({ http } = store.endpoints(store.SERVER_URL));
   } catch {
     return { ok: false, error: "Adresse de serveur invalide." };
   }
@@ -136,7 +136,7 @@ async function pair(code: string, serverUrl: string): Promise<{ ok: true } | { o
   }
 
   const data = (await response.json()) as PairResponse;
-  store.update({ serverUrl: http, token: data.token, user: data.user });
+  store.update({ token: data.token, user: data.user });
   connection.restart();
   broadcastState();
   return { ok: true };
@@ -178,9 +178,7 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:state', () => appState());
 
-  ipcMain.handle('app:pair', (_event, payload: { code: string; serverUrl: string }) =>
-    pair(payload.code, payload.serverUrl),
-  );
+  ipcMain.handle('app:pair', (_event, payload: { code: string }) => pair(payload.code));
 
   ipcMain.handle('app:unlink', () => {
     store.update({ token: null, user: null });
@@ -197,9 +195,6 @@ app.whenReady().then(() => {
     }
     if (patch.allDisplays !== undefined && patch.allDisplays !== previous.allDisplays) {
       overlay.sync();
-    }
-    if (patch.serverUrl !== undefined && patch.serverUrl !== previous.serverUrl) {
-      connection.restart();
     }
     if (patch.launchAtLogin !== undefined) {
       app.setLoginItemSettings({ openAtLogin: patch.launchAtLogin });

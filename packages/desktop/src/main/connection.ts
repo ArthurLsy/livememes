@@ -67,7 +67,7 @@ export class Connection extends EventEmitter<Events> {
 
     let target: string;
     try {
-      target = store.endpoints(settings.serverUrl).ws;
+      target = store.endpoints(store.SERVER_URL).ws;
     } catch {
       this.#setStatus('unauthorized', "URL de serveur invalide.");
       return;

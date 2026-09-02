@@ -14,7 +14,7 @@ contextBridge.exposeInMainWorld('overlay', {
 /** API de la fenetre de reglages. */
 contextBridge.exposeInMainWorld('livememes', {
   getState: () => ipcRenderer.invoke('app:state'),
-  pair: (code: string, serverUrl: string) => ipcRenderer.invoke('app:pair', { code, serverUrl }),
+  pair: (code: string) => ipcRenderer.invoke('app:pair', { code }),
   unlink: () => ipcRenderer.invoke('app:unlink'),
   setSettings: (patch: Record<string, unknown>) => ipcRenderer.invoke('app:setSettings', patch),
   preview: () => ipcRenderer.invoke('app:preview'),

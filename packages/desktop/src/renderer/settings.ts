@@ -16,7 +16,7 @@ declare global {
   interface Window {
     livememes: {
       getState(): Promise<AppState>;
-      pair(code: string, serverUrl: string): Promise<{ ok: true } | { ok: false; error: string }>;
+      pair(code: string): Promise<{ ok: true } | { ok: false; error: string }>;
       unlink(): Promise<void>;
       setSettings(patch: Record<string, unknown>): Promise<AppState>;
       preview(): Promise<void>;
@@ -34,7 +34,6 @@ const dot = $<HTMLElement>('dot');
 const statusText = $<HTMLElement>('statusText');
 const pairError = $<HTMLElement>('pairError');
 const codeInput = $<HTMLInputElement>('code');
-const serverInput = $<HTMLInputElement>('serverUrl');
 const pairButton = $<HTMLButtonElement>('pairButton');
 
 const STATUS: Record<AppState['status'], { label: string; cls: string }> = {
@@ -44,9 +43,6 @@ const STATUS: Record<AppState['status'], { label: string; cls: string }> = {
   unauthorized: { label: 'Non lie', cls: 'error' },
 };
 
-/** true tant que l'utilisateur tape : on ne veut pas ecraser sa saisie. */
-let editing = false;
-
 function apply(state: AppState): void {
   const status = STATUS[state.status];
   dot.className = `dot ${status.cls}`;
@@ -55,10 +51,7 @@ function apply(state: AppState): void {
   pairCard.hidden = state.linked;
   linkedCard.hidden = !state.linked;
 
-  if (!state.linked) {
-    if (!editing) serverInput.value = state.serverUrl;
-    return;
-  }
+  if (!state.linked) return;
 
   $<HTMLElement>('username').textContent = state.user?.username ?? '';
   $<HTMLElement>('serverLabel').textContent = state.serverUrl;
@@ -74,15 +67,6 @@ function apply(state: AppState): void {
 
 /* -------------------------------------------------------------------------- */
 
-for (const input of [codeInput, serverInput]) {
-  input.addEventListener('focus', () => {
-    editing = true;
-  });
-  input.addEventListener('blur', () => {
-    editing = false;
-  });
-}
-
 codeInput.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') void submitPair();
 });
@@ -91,7 +75,6 @@ pairButton.addEventListener('click', () => void submitPair());
 
 async function submitPair(): Promise<void> {
   const code = codeInput.value.trim().toUpperCase();
-  const serverUrl = serverInput.value.trim();
 
   if (code.length < 4) {
     pairError.hidden = false;
@@ -103,7 +86,7 @@ async function submitPair(): Promise<void> {
   pairButton.textContent = 'Connexion…';
   pairError.hidden = true;
 
-  const result = await window.livememes.pair(code, serverUrl);
+  const result = await window.livememes.pair(code);
 
   pairButton.disabled = false;
   pairButton.textContent = 'Connecter';
