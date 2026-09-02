@@ -40,6 +40,7 @@
     "linux": {
       "target": ["AppImage"],
       "category": "Utility",
+      "executableName": "livememes",
       "maintainer": "ArthurLsy <ArthurLsy@users.noreply.github.com>"
     }
   }
