@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('overlay', {
   onClear: (handler: (dropId: string | null) => void) => {
     ipcRenderer.on('overlay:clear', (_event, dropId: string | null) => handler(dropId));
   },
+  onIdentify: (handler: (payload: { number: number; durationMs: number }) => void) => {
+    ipcRenderer.on('overlay:identify', (_event, payload: { number: number; durationMs: number }) => handler(payload));
+  },
 });
 
 /** API de la fenetre de reglages. */
@@ -20,6 +23,7 @@ contextBridge.exposeInMainWorld('livememes', {
   preview: () => ipcRenderer.invoke('app:preview'),
   checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
   applyUpdate: () => ipcRenderer.invoke('app:applyUpdate'),
+  identifyDisplays: () => ipcRenderer.invoke('app:identifyDisplays'),
   quit: () => ipcRenderer.invoke('app:quit'),
   onState: (handler: (state: unknown) => void) => {
     ipcRenderer.on('app:state', (_event, state) => handler(state));

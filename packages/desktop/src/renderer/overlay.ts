@@ -5,6 +5,7 @@ declare global {
     overlay: {
       onDrop(handler: (drop: MemeDrop) => void): void;
       onClear(handler: (dropId: string | null) => void): void;
+      onIdentify(handler: (payload: { number: number; durationMs: number }) => void): void;
     };
   }
 }
@@ -186,4 +187,14 @@ window.overlay.onClear((dropId) => {
   }
   queue.length = 0;
   if (current) remove(current.id);
+});
+
+// Numero geant au centre de l'ecran, pour reperer quel ecran est lequel dans
+// les reglages.
+window.overlay.onIdentify(({ number, durationMs }) => {
+  const badge = document.createElement('div');
+  badge.className = 'identify';
+  badge.textContent = String(number);
+  stage.append(badge);
+  window.setTimeout(() => badge.remove(), durationMs);
 });

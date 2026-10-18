@@ -256,3 +256,47 @@ input[type='range']::-webkit-slider-thumb {
   font-size: 12px;
   color: var(--muted);
 }
+
+.row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+button.small {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.choices {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+
+.choices label,
+.display-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.choices input,
+.display-list input {
+  accent-color: var(--accent);
+}
+
+.display-list {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #0f111a;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+#displayHint { margin-top: 6px; }

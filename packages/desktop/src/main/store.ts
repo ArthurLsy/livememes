@@ -10,14 +10,20 @@ import { app } from 'electron';
  */
 export const SERVER_URL = process.env.LIVEMEMES_SERVER ?? 'https://meme.gowey.fr';
 
+export type DisplayChoice = 'primary' | 'all' | number[];
+
 export interface Settings {
   token: string | null;
   user: { id: string; username: string; avatarUrl: string | null } | null;
   /** Volume applique par-dessus celui demande par l'expediteur, 0-1. */
   volume: number;
   muted: boolean;
-  /** Afficher les memes sur tous les ecrans ou seulement le principal. */
-  allDisplays: boolean;
+  /**
+   * Ecrans d'affichage : le principal, tous, ou une liste de `display.id`.
+   * Un ecran choisi mais debranche est ignore ; si plus aucun ne reste, on
+   * retombe sur l'ecran principal.
+   */
+  displays: DisplayChoice;
   launchAtLogin: boolean;
 }
 
@@ -26,7 +32,7 @@ const DEFAULTS: Settings = {
   user: null,
   volume: 0.7,
   muted: false,
-  allDisplays: false,
+  displays: 'primary',
   launchAtLogin: false,
 };
 
@@ -36,8 +42,12 @@ let cache: Settings;
 export function load(): Settings {
   file = path.join(app.getPath('userData'), 'settings.json');
   try {
-    const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Settings>;
+    const { allDisplays, ...raw } = JSON.parse(fs.readFileSync(file, 'utf8')) as Partial<Settings> & {
+      allDisplays?: boolean;
+    };
     cache = { ...DEFAULTS, ...raw };
+    // Reprise de l'ancien booleen allDisplays (versions <= 0.1.0-beta.1).
+    if (raw.displays === undefined && allDisplays) cache.displays = 'all';
   } catch {
     cache = { ...DEFAULTS };
   }

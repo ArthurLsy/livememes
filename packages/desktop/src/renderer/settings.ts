@@ -6,7 +6,8 @@ interface AppState {
   user: { id: string; username: string; avatarUrl: string | null } | null;
   volume: number;
   muted: boolean;
-  allDisplays: boolean;
+  displays: 'primary' | 'all' | number[];
+  displayList: { id: number; label: string; primary: boolean; active: boolean }[];
   launchAtLogin: boolean;
   status: 'offline' | 'connecting' | 'online' | 'unauthorized';
   detail: string | null;
@@ -31,6 +32,7 @@ declare global {
       preview(): Promise<void>;
       checkUpdate(): Promise<void>;
       applyUpdate(): Promise<void>;
+      identifyDisplays(): Promise<void>;
       quit(): Promise<void>;
       onState(handler: (state: AppState) => void): void;
     };
@@ -99,6 +101,41 @@ function applyUpdater({ mode, currentVersion, update }: AppState['updater']): vo
   }
 }
 
+/** Derniere liste choisie, conservee si on repasse par "principal" ou "tous". */
+let customDisplays: number[] = [];
+let lastDisplayList: AppState['displayList'] = [];
+
+function applyDisplays({ displays, displayList }: AppState): void {
+  const mode = Array.isArray(displays) ? 'custom' : displays;
+  if (Array.isArray(displays)) customDisplays = displays;
+  lastDisplayList = displayList;
+
+  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="displayMode"]')) {
+    radio.checked = radio.value === mode;
+  }
+
+  const list = $<HTMLElement>('displayList');
+  list.hidden = mode !== 'custom';
+  list.replaceChildren(
+    ...displayList.map((display) => {
+      const label = document.createElement('label');
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = String(display.id);
+      box.checked = Array.isArray(displays) && displays.includes(display.id);
+      label.append(box, ` ${display.label}${display.primary ? ' — principal' : ''}`);
+      return label;
+    }),
+  );
+
+  // Choix fait sur des ecrans aujourd'hui debranches : on le dit plutot que
+  // d'afficher une liste vide de coches.
+  const hint = $<HTMLElement>('displayHint');
+  const connected = Array.isArray(displays) && displays.some((id) => displayList.some((d) => d.id === id));
+  hint.hidden = mode !== 'custom' || connected;
+  hint.textContent = 'Aucun ecran choisi parmi ceux branches : affichage sur l\'ecran principal.';
+}
+
 function apply(state: AppState): void {
   applyUpdater(state.updater);
 
@@ -118,7 +155,7 @@ function apply(state: AppState): void {
   if (state.user?.avatarUrl) avatar.src = state.user.avatarUrl;
 
   $<HTMLInputElement>('muted').checked = state.muted;
-  $<HTMLInputElement>('allDisplays').checked = state.allDisplays;
+  applyDisplays(state);
   $<HTMLInputElement>('launchAtLogin').checked = state.launchAtLogin;
   $<HTMLInputElement>('volume').value = String(Math.round(state.volume * 100));
 }
@@ -161,8 +198,30 @@ $<HTMLInputElement>('muted').addEventListener('change', (event) => {
   void window.livememes.setSettings({ muted: (event.target as HTMLInputElement).checked });
 });
 
-$<HTMLInputElement>('allDisplays').addEventListener('change', (event) => {
-  void window.livememes.setSettings({ allDisplays: (event.target as HTMLInputElement).checked });
+for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="displayMode"]')) {
+  radio.addEventListener('change', () => {
+    if (!radio.checked) return;
+    void window.livememes.setSettings({
+      // Premiere selection : on part des ecrans utilises en ce moment.
+      displays:
+        radio.value !== 'custom'
+          ? radio.value
+          : customDisplays.length > 0
+            ? customDisplays
+            : lastDisplayList.filter((display) => display.active).map((display) => display.id),
+    });
+  });
+}
+
+$<HTMLElement>('displayList').addEventListener('change', () => {
+  const ids = [...document.querySelectorAll<HTMLInputElement>('#displayList input:checked')].map((box) =>
+    Number(box.value),
+  );
+  void window.livememes.setSettings({ displays: ids });
+});
+
+$<HTMLButtonElement>('identifyButton').addEventListener('click', () => {
+  void window.livememes.identifyDisplays();
 });
 
 $<HTMLInputElement>('launchAtLogin').addEventListener('change', (event) => {

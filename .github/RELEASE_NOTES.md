@@ -34,7 +34,7 @@ salon textuel.
 
 `/livememes mute` coupe la reception, `/livememes clear` efface ce qui est a
 l'ecran, `/livememes status` dit qui, dans ton vocal, peut recevoir des memes.
-Dans l'app : sourdine, volume, affichage sur tous les ecrans, lancement au
+Dans l'app : sourdine, volume, choix des ecrans d'affichage, lancement au
 demarrage.
 
 L'overlay ne bloque jamais un clic : la souris le traverse.
