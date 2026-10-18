@@ -11,16 +11,32 @@ declare global {
 
 const stage = document.getElementById('stage') as HTMLDivElement;
 
-/** Au-dela, les memes se chevauchent trop pour rester lisibles. */
-const MAX_CONCURRENT = 4;
 const EXIT_MS = 320;
 
+/**
+ * File d'attente : un seul meme a l'ecran, les suivants attendent leur tour
+ * dans l'ordre d'arrivee. Chaque fenetre d'overlay (un ecran) a la sienne.
+ * File pleine, les nouveaux memes sont ignores plutot que d'evincer ceux deja
+ * annonces ; un meme qui a trop attendu n'a plus de sens et saute.
+ */
+const MAX_QUEUE = 8;
+const MAX_WAIT_MS = 2 * 60 * 1000;
+
 interface Active {
+  id: string;
   element: HTMLElement;
   timer: number;
 }
 
-const active = new Map<string, Active>();
+interface Queued {
+  drop: MemeDrop;
+  receivedAt: number;
+}
+
+let current: Active | null = null;
+/** Vrai pendant l'animation de sortie : le suivant attend qu'elle finisse. */
+let leaving = false;
+const queue: Queued[] = [];
 
 /** Coordonnees du centre du meme, en pourcentage de l'ecran. */
 function anchorFor(position: MemePosition): { x: number; y: number } {
@@ -83,25 +99,42 @@ function buildMedia(drop: MemeDrop, onEnd: () => void): HTMLElement {
 }
 
 function remove(id: string): void {
-  const entry = active.get(id);
-  if (!entry) return;
-  active.delete(id);
+  const index = queue.findIndex((entry) => entry.drop.id === id);
+  if (index !== -1) queue.splice(index, 1);
+
+  if (current?.id !== id) return;
+  const entry = current;
+  current = null;
+  leaving = true;
 
   window.clearTimeout(entry.timer);
   entry.element.classList.add('leaving');
-  window.setTimeout(() => entry.element.remove(), EXIT_MS);
+  window.setTimeout(() => {
+    entry.element.remove();
+    leaving = false;
+    next();
+  }, EXIT_MS);
+}
+
+function next(): void {
+  if (current || leaving) return;
+  while (queue.length > 0) {
+    const { drop, receivedAt } = queue.shift()!;
+    if (Date.now() - receivedAt <= MAX_WAIT_MS) {
+      render(drop);
+      return;
+    }
+  }
+}
+
+function enqueue(drop: MemeDrop): void {
+  if (current?.id === drop.id || queue.some((entry) => entry.drop.id === drop.id)) return;
+  if (queue.length >= MAX_QUEUE) return;
+  queue.push({ drop, receivedAt: Date.now() });
+  next();
 }
 
 function render(drop: MemeDrop): void {
-  if (active.has(drop.id)) return;
-
-  // Le plus ancien sort pour laisser la place au nouveau.
-  while (active.size >= MAX_CONCURRENT) {
-    const oldest = active.keys().next();
-    if (oldest.done) break;
-    remove(oldest.value);
-  }
-
   const anchor = anchorFor(drop.position);
   const element = document.createElement('div');
   element.className = 'drop';
@@ -137,18 +170,20 @@ function render(drop: MemeDrop): void {
   // L'animation de sortie doit se terminer dans la duree annoncee. Pour une
   // video jouee une fois, le timer n'est qu'un filet : `ended` arrive avant.
   const visibleMs = Math.max(600, (drop.maxDurationMs ?? drop.durationMs) - EXIT_MS);
-  active.set(drop.id, {
+  current = {
+    id: drop.id,
     element,
     timer: window.setTimeout(() => remove(drop.id), visibleMs),
-  });
+  };
 }
 
-window.overlay.onDrop(render);
+window.overlay.onDrop(enqueue);
 
 window.overlay.onClear((dropId) => {
   if (dropId) {
     remove(dropId);
     return;
   }
-  for (const id of [...active.keys()]) remove(id);
+  queue.length = 0;
+  if (current) remove(current.id);
 });

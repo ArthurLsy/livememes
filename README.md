@@ -139,6 +139,11 @@ alors un plafond, et `DROP_MAX_VIDEO_DURATION_MS` (60 s par defaut) coupe les
 videos plus longues. Images et GIF restent affiches pendant `duree`
 (`DROP_DEFAULT_DURATION_MS`, plafonne par `DROP_MAX_DURATION_MS`).
 
+Plusieurs memes envoyes d'affilee s'affichent l'un apres l'autre, dans l'ordre
+d'arrivee : chaque ecran a sa file de 8 memes en attente. File pleine, les
+nouveaux sont ignores ; un meme qui attend plus de 2 minutes saute.
+`/livememes clear` vide aussi la file.
+
 ### Restreindre a un role
 
 `DROP_ROLE_ID` limite les memes aux porteurs d'un role, **a l'envoi comme a la
