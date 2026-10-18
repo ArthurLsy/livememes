@@ -58,7 +58,7 @@ npm run dev               # backend + bot
 npm run dev:desktop       # overlay (autre terminal)
 ```
 
-L'overlay vise `https://meme.gowey.fr` par defaut. Pour le brancher sur un backend
+L'overlay vise `https://preprod-meme.gowey.fr` par defaut. Pour le brancher sur un backend
 local, lance-le avec `LIVEMEMES_SERVER=http://localhost:8787 npm run dev:desktop` :
 c'est la seule facon de changer de serveur, l'URL n'est plus saisissable dans l'app.
 
@@ -101,7 +101,7 @@ dans ~150 Mo de RAM, HTTP et WebSocket partagent le port **8787**.
    plafonne la creation de commandes globales a 200/jour, et un conteneur qui
    redemarre en boucle epuiserait le quota). Sinon, lance
    `npm run commands:deploy` une fois depuis le terminal Coolify.
-5. L'app desktop pointe sur `https://meme.gowey.fr`, fige dans `SERVER_URL`
+5. L'app desktop pointe sur `https://preprod-meme.gowey.fr`, fige dans `SERVER_URL`
    (`packages/desktop/src/main/store.ts`). Un autre domaine impose de changer
    cette constante et de reconstruire le client.
 

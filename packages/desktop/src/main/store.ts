@@ -8,7 +8,7 @@ import { app } from 'electron';
  * sur les installations existantes. LIVEMEMES_SERVER reste la porte de sortie
  * pour le developpement local.
  */
-export const SERVER_URL = process.env.LIVEMEMES_SERVER ?? 'https://meme.gowey.fr';
+export const SERVER_URL = process.env.LIVEMEMES_SERVER ?? 'https://preprod-meme.gowey.fr';
 
 export type DisplayChoice = 'primary' | 'all' | number[];
 
