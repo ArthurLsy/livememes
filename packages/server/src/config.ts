@@ -25,6 +25,18 @@ function int(name: string, fallback: number): number {
   return parsed;
 }
 
+/**
+ * TRUST_PROXY, transmis tel quel a `app.set('trust proxy')` d'Express : un nombre
+ * de proxys, true/false, ou une liste d'IP/sous-reseaux separes par des virgules.
+ */
+function trustProxy(): boolean | number | string {
+  const raw = (process.env.TRUST_PROXY ?? '').trim();
+  if (raw === '' || raw === 'false') return false;
+  if (raw === 'true') return true;
+  if (/^\d+$/.test(raw)) return Number.parseInt(raw, 10);
+  return raw;
+}
+
 export const config = {
   repoRoot,
   dataDir: process.env.DATA_DIR ?? path.join(repoRoot, 'data'),
@@ -47,6 +59,12 @@ export const config = {
     port: int('PORT', 8787),
     /** URL publique du backend : c'est ce que l'overlay recoit dans MemeDrop.url. */
     publicUrl: (process.env.PUBLIC_URL ?? `http://localhost:${int('PORT', 8787)}`).replace(/\/$/, ''),
+    /**
+     * Proxys de confiance devant le backend, pour que `req.ip` soit l'IP du client
+     * (limite anti brute-force de l'appairage). Desactive par defaut : expose en
+     * direct, faire confiance a X-Forwarded-For permettrait de falsifier son IP.
+     */
+    trustProxy: trustProxy(),
   },
 
   media: {
