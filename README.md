@@ -134,6 +134,11 @@ Le cache media grossit avec l'usage et se purge tout seul selon
 Options communes : `texte` (legende), `duree` (secondes), `taille`
 (petit/moyen/grand/plein ecran), `position` (centre, coins, aleatoire), `volume`.
 
+Une video est jouee une fois, jusqu'a la fin, puis disparait. `duree` devient
+alors un plafond, et `DROP_MAX_VIDEO_DURATION_MS` (60 s par defaut) coupe les
+videos plus longues. Images et GIF restent affiches pendant `duree`
+(`DROP_DEFAULT_DURATION_MS`, plafonne par `DROP_MAX_DURATION_MS`).
+
 ### Restreindre a un role
 
 `DROP_ROLE_ID` limite les memes aux porteurs d'un role, **a l'envoi comme a la

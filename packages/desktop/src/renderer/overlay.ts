@@ -42,21 +42,36 @@ function anchorFor(position: MemePosition): { x: number; y: number } {
   }
 }
 
-function buildMedia(drop: MemeDrop): HTMLElement {
+/**
+ * `onEnd` est appele quand une video jouee jusqu'au bout se termine ou ne peut
+ * pas etre lue. Sans `maxDurationMs` (serveur ancien), la video boucle et seul
+ * le timer de `durationMs` la retire, comme avant.
+ */
+function buildMedia(drop: MemeDrop, onEnd: () => void): HTMLElement {
   if (drop.kind === 'video') {
+    const playOnce = drop.maxDurationMs !== undefined;
     const video = document.createElement('video');
     video.className = 'drop__media';
     video.src = drop.url;
     video.autoplay = true;
-    video.loop = true;
+    video.loop = !playOnce;
+    if (playOnce) {
+      video.addEventListener('ended', onEnd);
+      video.addEventListener('error', onEnd);
+    }
     video.playsInline = true;
     video.volume = Math.max(0, Math.min(1, drop.volume));
     // Chrome bloque l'autoplay sonore sans interaction : on demarre muet,
     // puis on remet le son des que la lecture est lancee.
     video.muted = true;
-    void video.play().then(() => {
-      if (drop.volume > 0) video.muted = false;
-    });
+    // Un echec de lecture n'est pas fatal : `error` ou le timer de securite
+    // retirent le meme.
+    video.play().then(
+      () => {
+        if (drop.volume > 0) video.muted = false;
+      },
+      () => {},
+    );
     return video;
   }
 
@@ -94,7 +109,7 @@ function render(drop: MemeDrop): void {
   element.style.setProperty('--y', `${anchor.y}%`);
   element.style.setProperty('--h', `${Math.round(drop.scale * 100)}vh`);
 
-  element.append(buildMedia(drop));
+  element.append(buildMedia(drop, () => remove(drop.id)));
 
   if (drop.caption) {
     const caption = document.createElement('div');
@@ -119,8 +134,9 @@ function render(drop: MemeDrop): void {
 
   stage.append(element);
 
-  // L'animation de sortie doit se terminer dans la duree annoncee.
-  const visibleMs = Math.max(600, drop.durationMs - EXIT_MS);
+  // L'animation de sortie doit se terminer dans la duree annoncee. Pour une
+  // video jouee une fois, le timer n'est qu'un filet : `ended` arrive avant.
+  const visibleMs = Math.max(600, (drop.maxDurationMs ?? drop.durationMs) - EXIT_MS);
   active.set(drop.id, {
     element,
     timer: window.setTimeout(() => remove(drop.id), visibleMs),

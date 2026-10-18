@@ -60,6 +60,8 @@ export const config = {
   drops: {
     defaultDurationMs: int('DROP_DEFAULT_DURATION_MS', 6_000),
     maxDurationMs: int('DROP_MAX_DURATION_MS', 20_000),
+    /** Plafond d'une video jouee jusqu'a la fin : au-dela, elle est coupee. */
+    maxVideoDurationMs: int('DROP_MAX_VIDEO_DURATION_MS', 60_000),
     /** Delai minimum entre deux drops d'un meme utilisateur. */
     cooldownMs: int('DROP_COOLDOWN_MS', 8_000),
     /**
