@@ -2,6 +2,7 @@ import express from 'express';
 import type { PairRequest, PairResponse } from '@livememes/shared';
 import { redeemPairingCode } from '../store/devices.ts';
 import * as media from '../media/cache.ts';
+import { config } from '../config.ts';
 
 /** Petit garde-fou anti brute-force sur les codes d'appairage (8 caracteres). */
 const pairAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -19,9 +20,18 @@ function tooManyAttempts(ip: string): boolean {
   return entry.count > PAIR_MAX_ATTEMPTS;
 }
 
+// Sans purge, chaque IP vue resterait en memoire indefiniment.
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of pairAttempts) {
+    if (entry.resetAt < now) pairAttempts.delete(ip);
+  }
+}, 60 * 1000).unref();
+
 export function createApp(): express.Express {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', config.http.trustProxy);
   app.use(express.json({ limit: '16kb' }));
 
   app.get('/health', (_req, res) => {
@@ -72,6 +82,7 @@ export function createApp(): express.Express {
 
     res.type(found.contentType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.sendFile(found.file);
   });
 

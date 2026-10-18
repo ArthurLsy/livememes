@@ -9,3 +9,6 @@ services:
   server:
     ports:
       - '${HOST_PORT:-8787}:8787'
+    environment:
+      # Expose en direct, sans proxy : X-Forwarded-For serait falsifiable.
+      TRUST_PROXY: 'false'

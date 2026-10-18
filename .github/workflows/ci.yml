@@ -1,0 +1,56 @@
+name: ci
+
+# Verifie chaque push sur main, puis declenche le deploiement Coolify si tout
+# est vert. Le deploiement automatique de Coolify doit etre coupe : c'est ce
+# workflow qui l'appelle, pour qu'un commit casse n'arrive jamais en prod.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: typecheck + tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      # Les tests posent eux-memes leurs process.env : aucun secret n'est requis.
+      - run: npm test
+      # Verifie que le bundle desktop compile (esbuild), sans packager.
+      - name: Bundle desktop
+        run: npm run build --workspace @livememes/desktop
+
+  # Appelle le webhook de deploiement Coolify, uniquement si `verify` est vert.
+  # Secrets a creer dans GitHub (Settings > Secrets and variables > Actions) :
+  #   COOLIFY_WEBHOOK : URL "Deploy Webhook" de la ressource (onglet Webhooks)
+  #   COOLIFY_TOKEN   : token API Coolify (Keys & Tokens), permission "deploy"
+  deploy:
+    name: deploiement Coolify
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Declenche le deploiement
+        env:
+          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -z "$COOLIFY_WEBHOOK" ] || [ -z "$COOLIFY_TOKEN" ]; then
+            echo "::error::Secrets COOLIFY_WEBHOOK et COOLIFY_TOKEN manquants : rien n'a ete deploye."
+            exit 1
+          fi
+          curl --fail-with-body --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_WEBHOOK"

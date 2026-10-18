@@ -12,6 +12,8 @@ process.env.DISCORD_TOKEN = 'test-token';
 process.env.DISCORD_CLIENT_ID = 'test-client';
 process.env.DATA_DIR = tmpData;
 process.env.PORT = '0';
+// Un proxy devant le backend : req.ip vient de X-Forwarded-For.
+process.env.TRUST_PROXY = '1';
 
 const { createApp } = await import('../src/http/app.ts');
 const { attachGateway } = await import('../src/realtime/gateway.ts');
@@ -109,6 +111,20 @@ describe('appairage', () => {
       body: JSON.stringify({ code: 'ZZZZZZZZ', deviceName: 'PC' }),
     });
     assert.equal(response.status, 400);
+  });
+
+  it('compte les tentatives par client derriere le proxy', async () => {
+    const attempt = (ip: string) =>
+      fetch(`${baseUrl}/api/pair`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+        body: JSON.stringify({ code: 'ZZZZZZZZ', deviceName: 'PC' }),
+      }).then((response) => response.status);
+
+    for (let i = 0; i < 10; i++) assert.equal(await attempt('203.0.113.10'), 400);
+    assert.equal(await attempt('203.0.113.10'), 429);
+    // Un autre client, meme proxy : compteur intact.
+    assert.equal(await attempt('203.0.113.20'), 400);
   });
 
   it('refuse de reutiliser un code deja consomme', async () => {

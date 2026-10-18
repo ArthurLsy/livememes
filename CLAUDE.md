@@ -25,7 +25,7 @@ cp .env.example .env          # DISCORD_TOKEN et DISCORD_CLIENT_ID obligatoires
 npm run dev                   # backend + bot (tsx watch)
 npm run dev:desktop           # overlay Electron (esbuild watch + electron)
 npm run commands:deploy       # enregistre les slash commands aupres de Discord
-npm test                      # tests du serveur
+npm test                      # tests shared + serveur + logique overlay
 npm run typecheck             # tsc --noEmit sur les deux packages
 npm run dist:desktop          # binaire desktop -> packages/desktop/release/
 ```

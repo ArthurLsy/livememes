@@ -1,4 +1,5 @@
 import type { MemeDrop, MemePosition } from '@livememes/shared';
+import { DropQueue, playsOnce, type View } from './queue.ts';
 
 declare global {
   interface Window {
@@ -11,33 +12,6 @@ declare global {
 }
 
 const stage = document.getElementById('stage') as HTMLDivElement;
-
-const EXIT_MS = 320;
-
-/**
- * File d'attente : un seul meme a l'ecran, les suivants attendent leur tour
- * dans l'ordre d'arrivee. Chaque fenetre d'overlay (un ecran) a la sienne.
- * File pleine, les nouveaux memes sont ignores plutot que d'evincer ceux deja
- * annonces ; un meme qui a trop attendu n'a plus de sens et saute.
- */
-const MAX_QUEUE = 8;
-const MAX_WAIT_MS = 2 * 60 * 1000;
-
-interface Active {
-  id: string;
-  element: HTMLElement;
-  timer: number;
-}
-
-interface Queued {
-  drop: MemeDrop;
-  receivedAt: number;
-}
-
-let current: Active | null = null;
-/** Vrai pendant l'animation de sortie : le suivant attend qu'elle finisse. */
-let leaving = false;
-const queue: Queued[] = [];
 
 /** Coordonnees du centre du meme, en pourcentage de l'ecran. */
 function anchorFor(position: MemePosition): { x: number; y: number } {
@@ -61,12 +35,11 @@ function anchorFor(position: MemePosition): { x: number; y: number } {
 
 /**
  * `onEnd` est appele quand une video jouee jusqu'au bout se termine ou ne peut
- * pas etre lue. Sans `maxDurationMs` (serveur ancien), la video boucle et seul
- * le timer de `durationMs` la retire, comme avant.
+ * pas etre lue (voir `playsOnce`).
  */
 function buildMedia(drop: MemeDrop, onEnd: () => void): HTMLElement {
   if (drop.kind === 'video') {
-    const playOnce = drop.maxDurationMs !== undefined;
+    const playOnce = playsOnce(drop);
     const video = document.createElement('video');
     video.className = 'drop__media';
     video.src = drop.url;
@@ -99,43 +72,7 @@ function buildMedia(drop: MemeDrop, onEnd: () => void): HTMLElement {
   return image;
 }
 
-function remove(id: string): void {
-  const index = queue.findIndex((entry) => entry.drop.id === id);
-  if (index !== -1) queue.splice(index, 1);
-
-  if (current?.id !== id) return;
-  const entry = current;
-  current = null;
-  leaving = true;
-
-  window.clearTimeout(entry.timer);
-  entry.element.classList.add('leaving');
-  window.setTimeout(() => {
-    entry.element.remove();
-    leaving = false;
-    next();
-  }, EXIT_MS);
-}
-
-function next(): void {
-  if (current || leaving) return;
-  while (queue.length > 0) {
-    const { drop, receivedAt } = queue.shift()!;
-    if (Date.now() - receivedAt <= MAX_WAIT_MS) {
-      render(drop);
-      return;
-    }
-  }
-}
-
-function enqueue(drop: MemeDrop): void {
-  if (current?.id === drop.id || queue.some((entry) => entry.drop.id === drop.id)) return;
-  if (queue.length >= MAX_QUEUE) return;
-  queue.push({ drop, receivedAt: Date.now() });
-  next();
-}
-
-function render(drop: MemeDrop): void {
+function mount(drop: MemeDrop, end: () => void): View {
   const anchor = anchorFor(drop.position);
   const element = document.createElement('div');
   element.className = 'drop';
@@ -143,7 +80,7 @@ function render(drop: MemeDrop): void {
   element.style.setProperty('--y', `${anchor.y}%`);
   element.style.setProperty('--h', `${Math.round(drop.scale * 100)}vh`);
 
-  element.append(buildMedia(drop, () => remove(drop.id)));
+  element.append(buildMedia(drop, end));
 
   if (drop.caption) {
     const caption = document.createElement('div');
@@ -168,25 +105,25 @@ function render(drop: MemeDrop): void {
 
   stage.append(element);
 
-  // L'animation de sortie doit se terminer dans la duree annoncee. Pour une
-  // video jouee une fois, le timer n'est qu'un filet : `ended` arrive avant.
-  const visibleMs = Math.max(600, (drop.maxDurationMs ?? drop.durationMs) - EXIT_MS);
-  current = {
-    id: drop.id,
-    element,
-    timer: window.setTimeout(() => remove(drop.id), visibleMs),
+  return {
+    leave: () => element.classList.add('leaving'),
+    destroy: () => element.remove(),
   };
 }
 
-window.overlay.onDrop(enqueue);
+// Chaque fenetre d'overlay (un ecran) a sa propre file.
+const queue = new DropQueue({
+  mount,
+  now: () => Date.now(),
+  setTimeout: (callback, ms) => window.setTimeout(callback, ms),
+  clearTimeout: (id) => window.clearTimeout(id),
+});
+
+window.overlay.onDrop((drop) => queue.enqueue(drop));
 
 window.overlay.onClear((dropId) => {
-  if (dropId) {
-    remove(dropId);
-    return;
-  }
-  queue.length = 0;
-  if (current) remove(current.id);
+  if (dropId) queue.remove(dropId);
+  else queue.clear();
 });
 
 // Numero geant au centre de l'ecran, pour reperer quel ecran est lequel dans
