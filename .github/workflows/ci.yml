@@ -51,6 +51,8 @@ jobs:
             echo "::error::Secrets COOLIFY_WEBHOOK et COOLIFY_TOKEN manquants : rien n'a ete deploye."
             exit 1
           fi
+          # Coolify n'accepte plus que POST sur ce webhook (GET -> 405).
           curl --fail-with-body --silent --show-error --max-time 30 \
+            -X POST \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
             "$COOLIFY_WEBHOOK"
