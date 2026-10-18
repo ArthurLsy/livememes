@@ -50,12 +50,18 @@
           <input type="checkbox" id="muted" class="switch" />
         </div>
 
-        <div class="row">
-          <div>
-            <div class="row__title">Tous les ecrans</div>
-            <div class="muted">Sinon, ecran principal uniquement</div>
+        <div class="row row--stack">
+          <div class="row__head">
+            <div class="row__title">Ecrans d'affichage</div>
+            <button class="small" id="identifyButton">Identifier</button>
           </div>
-          <input type="checkbox" id="allDisplays" class="switch" />
+          <div class="choices">
+            <label><input type="radio" name="displayMode" value="primary" /> Ecran principal</label>
+            <label><input type="radio" name="displayMode" value="all" /> Tous les ecrans</label>
+            <label><input type="radio" name="displayMode" value="custom" /> Choisir</label>
+          </div>
+          <div class="display-list" id="displayList" hidden></div>
+          <div class="muted" id="displayHint" hidden></div>
         </div>
 
         <div class="row">

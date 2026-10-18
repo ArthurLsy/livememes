@@ -65,6 +65,11 @@ c'est la seule facon de changer de serveur, l'URL n'est plus saisissable dans l'
 L'overlay s'ouvre sur l'ecran de reglages. Dans Discord, fais `/livememes link`,
 colle le code, c'est lie.
 
+Les reglages choisissent ou s'affichent les memes : ecran principal (defaut),
+tous les ecrans, ou une selection. "Identifier" affiche le numero de chaque
+ecran. Un ecran choisi puis debranche est ignore ; si aucun ecran choisi n'est
+branche, l'overlay retombe sur l'ecran principal.
+
 > **`PUBLIC_URL` compte.** C'est l'URL que les overlays utilisent pour telecharger
 > les medias. En `localhost`, seuls les overlays de ta propre machine verront
 > quelque chose. Pour tester a plusieurs, expose le backend (Cloudflare Tunnel,

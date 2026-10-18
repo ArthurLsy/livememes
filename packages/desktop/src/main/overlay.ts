@@ -4,6 +4,8 @@ import type { MemeDrop } from '@livememes/shared';
 import * as store from './store.ts';
 
 const windows = new Map<number, BrowserWindow>();
+/** Fenetres ouvertes seulement pour `identify()` : elles ne recoivent aucun meme. */
+const identifyOnly = new Set<number>();
 
 const RENDERER = path.join(__dirname, '../renderer');
 const PRELOAD = path.join(__dirname, '../preload/index.cjs');
@@ -55,13 +57,41 @@ function createForDisplay(display: Display): BrowserWindow {
   return window;
 }
 
-/** (Re)cree les fenetres pour les ecrans cibles selon le reglage allDisplays. */
+/** Ecrans cibles selon le reglage `displays`, jamais vide. */
+function targetDisplays(): Display[] {
+  const choice = store.get().displays;
+  if (choice === 'all') return screen.getAllDisplays();
+  if (choice === 'primary') return [screen.getPrimaryDisplay()];
+
+  const chosen = screen.getAllDisplays().filter((display) => choice.includes(display.id));
+  return chosen.length > 0 ? chosen : [screen.getPrimaryDisplay()];
+}
+
+export interface DisplayInfo {
+  id: number;
+  label: string;
+  primary: boolean;
+  /** Vrai si l'overlay s'y affiche actuellement. */
+  active: boolean;
+}
+
+/** Ecrans branches, dans l'ordre de `identify()`, pour la fenetre de reglages. */
+export function listDisplays(): DisplayInfo[] {
+  const primaryId = screen.getPrimaryDisplay().id;
+  const active = new Set(targetDisplays().map((display) => display.id));
+  return screen.getAllDisplays().map((display, index) => ({
+    id: display.id,
+    label: `${index + 1}. ${display.label || 'Ecran'} (${display.size.width}x${display.size.height})`,
+    primary: display.id === primaryId,
+    active: active.has(display.id),
+  }));
+}
+
+/** (Re)cree les fenetres pour les ecrans cibles selon le reglage displays. */
 export function sync(): void {
-  const settings = store.get();
-  const displays = settings.allDisplays
-    ? screen.getAllDisplays()
-    : [screen.getPrimaryDisplay()];
+  const displays = targetDisplays();
   const wanted = new Set(displays.map((display) => display.id));
+  identifyOnly.clear();
 
   for (const [id, window] of windows) {
     if (!wanted.has(id)) {
@@ -93,6 +123,7 @@ function each(callback: (window: BrowserWindow) => void): void {
       windows.delete(id);
       continue;
     }
+    if (identifyOnly.has(id)) continue;
     callback(window);
   }
 }
@@ -130,6 +161,34 @@ export function preview(): void {
     guildName: null,
     sentAt: Date.now(),
   });
+}
+
+const IDENTIFY_MS = 3000;
+let identifyTimer: NodeJS.Timeout | null = null;
+
+/**
+ * Affiche le numero de chaque ecran, cibles ou non : les fenetres creees pour
+ * l'occasion disparaissent au `sync()` qui suit.
+ */
+export function identify(): void {
+  screen.getAllDisplays().forEach((display, index) => {
+    let window = windows.get(display.id);
+    if (!window || window.isDestroyed()) {
+      window = createForDisplay(display);
+      windows.set(display.id, window);
+      identifyOnly.add(display.id);
+    }
+    const target = window;
+    const send = () => target.webContents.send('overlay:identify', { number: index + 1, durationMs: IDENTIFY_MS });
+    if (target.webContents.isLoading()) target.webContents.once('did-finish-load', send);
+    else send();
+  });
+
+  if (identifyTimer) clearTimeout(identifyTimer);
+  identifyTimer = setTimeout(() => {
+    identifyTimer = null;
+    sync();
+  }, IDENTIFY_MS + 500);
 }
 
 export function destroyAll(): void {

@@ -1,6 +1,6 @@
 import path from 'node:path';
 import os from 'node:os';
-import { app, ipcMain, Menu, nativeImage, shell, Tray } from 'electron';
+import { app, ipcMain, Menu, nativeImage, screen, shell, Tray } from 'electron';
 import type { PairResponse } from '@livememes/shared';
 import * as store from './store.ts';
 import * as overlay from './overlay.ts';
@@ -34,7 +34,8 @@ function appState() {
     user: settings.user,
     volume: settings.volume,
     muted: settings.muted,
-    allDisplays: settings.allDisplays,
+    displays: settings.displays,
+    displayList: overlay.listDisplays(),
     launchAtLogin: settings.launchAtLogin,
     status: lastStatus,
     detail: lastDetail,
@@ -78,9 +79,9 @@ function renderTray(): void {
       {
         label: 'Afficher sur tous les ecrans',
         type: 'checkbox',
-        checked: settings.allDisplays,
+        checked: settings.displays === 'all',
         click: (item) => {
-          store.update({ allDisplays: item.checked });
+          store.update({ displays: item.checked ? 'all' : 'primary' });
           overlay.sync();
           broadcastState();
         },
@@ -104,6 +105,11 @@ function setMuted(muted: boolean): void {
   store.update({ muted });
   connection.send({ t: 'setMuted', muted });
   broadcastState();
+}
+
+function isDisplayChoice(value: unknown): value is store.DisplayChoice {
+  if (value === 'primary' || value === 'all') return true;
+  return Array.isArray(value) && value.every((id) => Number.isInteger(id));
 }
 
 /* -------------------------------------------------------------------------- */
@@ -166,6 +172,11 @@ app.whenReady().then(() => {
   connection.on('clear', (dropId) => overlay.clear(dropId));
   connection.on('muted', () => broadcastState());
 
+  // La liste des ecrans affichee dans les reglages suit les branchements.
+  screen.on('display-added', () => broadcastState());
+  screen.on('display-removed', () => broadcastState());
+  screen.on('display-metrics-changed', () => broadcastState());
+
   renderTray();
 
   if (store.get().token) {
@@ -188,12 +199,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:setSettings', (_event, patch: Partial<store.Settings>) => {
     const previous = store.get();
+    // Valeur ecrite telle quelle dans settings.json puis lue par overlay.sync().
+    if (patch.displays !== undefined && !isDisplayChoice(patch.displays)) delete patch.displays;
     store.update(patch);
 
     if (patch.muted !== undefined && patch.muted !== previous.muted) {
       connection.send({ t: 'setMuted', muted: patch.muted });
     }
-    if (patch.allDisplays !== undefined && patch.allDisplays !== previous.allDisplays) {
+    if (patch.displays !== undefined) {
       overlay.sync();
     }
     if (patch.launchAtLogin !== undefined) {
@@ -205,6 +218,8 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('app:preview', () => overlay.preview());
+
+  ipcMain.handle('app:identifyDisplays', () => overlay.identify());
 
   ipcMain.handle('app:quit', () => {
     quitting = true;

@@ -12,7 +12,7 @@ export function open(): BrowserWindow {
 
   window = new BrowserWindow({
     width: 520,
-    height: 660,
+    height: 740,
     resizable: false,
     title: 'LiveMemes',
     backgroundColor: '#0e0f13',
