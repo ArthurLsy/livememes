@@ -1,6 +1,15 @@
 Beta ouverte. Balance un meme depuis Discord, il s'affiche en plein ecran chez
 tous les membres de ton salon vocal.
 
+## Nouveau dans cette version
+
+- Les videos sont jouees une fois, jusqu'a la fin (60 s max), au lieu de boucler
+  ou d'etre coupees.
+- Plusieurs memes d'affilee s'affichent l'un apres l'autre au lieu de se
+  superposer.
+- Choix des ecrans d'affichage dans les reglages, avec un bouton "Identifier".
+- Mises a jour automatiques (voir plus bas).
+
 ## Installer
 
 | Systeme | Fichier |
