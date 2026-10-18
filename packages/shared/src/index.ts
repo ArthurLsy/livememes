@@ -90,10 +90,20 @@ export type ClientMessage =
   | { t: 'shown'; dropId: string }
   | { t: 'setMuted'; muted: boolean };
 
+/** Valide la forme complete du message : le gateway lit ses champs sans recontroler. */
 export function isClientMessage(value: unknown): value is ClientMessage {
   if (typeof value !== 'object' || value === null) return false;
-  const t = (value as { t?: unknown }).t;
-  return t === 'ping' || t === 'shown' || t === 'setMuted';
+  const message = value as Record<string, unknown>;
+  switch (message.t) {
+    case 'ping':
+      return typeof message.ts === 'number' && Number.isFinite(message.ts);
+    case 'shown':
+      return typeof message.dropId === 'string' && message.dropId.length > 0 && message.dropId.length <= 64;
+    case 'setMuted':
+      return typeof message.muted === 'boolean';
+    default:
+      return false;
+  }
 }
 
 /* -------------------------------------------------------------------------- */
