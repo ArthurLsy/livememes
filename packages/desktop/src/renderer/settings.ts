@@ -10,6 +10,15 @@ interface AppState {
   launchAtLogin: boolean;
   status: 'offline' | 'connecting' | 'online' | 'unauthorized';
   detail: string | null;
+  updater: {
+    mode: 'auto' | 'manual' | 'disabled';
+    currentVersion: string;
+    update:
+      | { state: 'idle' | 'checking' | 'upToDate' }
+      | { state: 'available' | 'ready'; version: string }
+      | { state: 'downloading'; version: string; percent: number }
+      | { state: 'error'; message: string };
+  };
 }
 
 declare global {
@@ -20,6 +29,8 @@ declare global {
       unlink(): Promise<void>;
       setSettings(patch: Record<string, unknown>): Promise<AppState>;
       preview(): Promise<void>;
+      checkUpdate(): Promise<void>;
+      applyUpdate(): Promise<void>;
       quit(): Promise<void>;
       onState(handler: (state: AppState) => void): void;
     };
@@ -43,7 +54,54 @@ const STATUS: Record<AppState['status'], { label: string; cls: string }> = {
   unauthorized: { label: 'Non lie', cls: 'error' },
 };
 
+let updateState: AppState['updater']['update']['state'] = 'idle';
+
+function applyUpdater({ mode, currentVersion, update }: AppState['updater']): void {
+  updateState = update.state;
+  const card = $<HTMLElement>('updateCard');
+  const text = $<HTMLElement>('updateText');
+  const button = $<HTMLButtonElement>('updateButton');
+
+  card.hidden = mode === 'disabled';
+  if (mode === 'disabled') return;
+
+  $<HTMLElement>('appVersion').textContent = `Version ${currentVersion}`;
+  button.hidden = false;
+  button.disabled = false;
+  button.textContent = 'Rechercher';
+
+  switch (update.state) {
+    case 'idle':
+      text.textContent = mode === 'auto' ? 'Mises a jour automatiques' : 'Mises a jour a installer a la main';
+      break;
+    case 'checking':
+      text.textContent = 'Recherche en cours…';
+      button.disabled = true;
+      break;
+    case 'upToDate':
+      text.textContent = 'A jour';
+      break;
+    case 'available':
+      text.textContent = `Version ${update.version} disponible`;
+      button.textContent = 'Telecharger';
+      break;
+    case 'downloading':
+      text.textContent = `Telechargement de la ${update.version} : ${update.percent} %`;
+      button.hidden = true;
+      break;
+    case 'ready':
+      text.textContent = `Version ${update.version} prete`;
+      button.textContent = 'Redemarrer';
+      break;
+    case 'error':
+      text.textContent = update.message;
+      break;
+  }
+}
+
 function apply(state: AppState): void {
+  applyUpdater(state.updater);
+
   const status = STATUS[state.status];
   dot.className = `dot ${status.cls}`;
   statusText.textContent = state.detail && state.status !== 'online' ? state.detail : status.label;
@@ -119,6 +177,11 @@ $<HTMLInputElement>('volume').addEventListener('change', (event) => {
 
 $<HTMLButtonElement>('previewButton').addEventListener('click', () => {
   void window.livememes.preview();
+});
+
+$<HTMLButtonElement>('updateButton').addEventListener('click', () => {
+  if (updateState === 'available' || updateState === 'ready') void window.livememes.applyUpdate();
+  else void window.livememes.checkUpdate();
 });
 
 $<HTMLButtonElement>('unlinkButton').addEventListener('click', () => {

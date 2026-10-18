@@ -19,6 +19,7 @@
     "@types/ws": "^8.18.1",
     "electron": "44.1.0",
     "electron-builder": "^26.15.3",
+    "electron-updater": "^6.8.9",
     "esbuild": "^0.27.2",
     "typescript": "^5.9.3",
     "ws": "^8.21.3"
@@ -30,6 +31,7 @@
     "directories": { "output": "release" },
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "npmRebuild": false,
+    "publish": { "provider": "github", "owner": "ArthurLsy", "repo": "livememes" },
     "mac": { "category": "public.app-category.entertainment", "target": ["dmg", "zip"] },
     "win": { "target": ["nsis", "zip"] },
     "nsis": {

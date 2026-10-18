@@ -1,10 +1,11 @@
 import path from 'node:path';
 import os from 'node:os';
-import { app, ipcMain, Menu, nativeImage, shell, Tray } from 'electron';
+import { app, ipcMain, Menu, nativeImage, shell, Tray, type MenuItemConstructorOptions } from 'electron';
 import type { PairResponse } from '@livememes/shared';
 import * as store from './store.ts';
 import * as overlay from './overlay.ts';
 import * as settingsWindow from './settings-window.ts';
+import * as updater from './updater.ts';
 import { Connection, type ConnectionStatus } from './connection.ts';
 
 // Instance unique : deux overlays afficheraient chaque meme en double.
@@ -38,6 +39,7 @@ function appState() {
     launchAtLogin: settings.launchAtLogin,
     status: lastStatus,
     detail: lastDetail,
+    updater: updater.status(),
   };
 }
 
@@ -57,9 +59,29 @@ const STATUS_LABEL: Record<ConnectionStatus, string> = {
   unauthorized: 'Appareil non lie',
 };
 
+/** Entree du menu refletant l'etat de la mise a jour ; null si l'updater est inactif. */
+function updateMenuItem(): MenuItemConstructorOptions | null {
+  const { mode, update } = updater.status();
+  if (mode === 'disabled') return null;
+
+  switch (update.state) {
+    case 'checking':
+      return { label: 'Recherche de mise a jour...', enabled: false };
+    case 'downloading':
+      return { label: `Telechargement de la ${update.version} (${update.percent} %)`, enabled: false };
+    case 'ready':
+      return { label: `Redemarrer pour installer la ${update.version}`, click: () => updater.apply() };
+    case 'available':
+      return { label: `Telecharger la ${update.version}...`, click: () => updater.apply() };
+    default:
+      return { label: 'Rechercher une mise a jour', click: () => updater.check() };
+  }
+}
+
 function renderTray(): void {
   if (!tray) return;
   const settings = store.get();
+  const updateItem = updateMenuItem();
 
   tray.setToolTip(`LiveMemes — ${STATUS_LABEL[lastStatus]}`);
   tray.setContextMenu(
@@ -89,6 +111,7 @@ function renderTray(): void {
       { label: 'Apercu', click: () => overlay.preview() },
       { label: 'Reglages...', click: () => settingsWindow.open() },
       { type: 'separator' },
+      ...(updateItem ? [updateItem, { type: 'separator' } as const] : []),
       {
         label: 'Quitter LiveMemes',
         click: () => {
@@ -166,6 +189,9 @@ app.whenReady().then(() => {
   connection.on('clear', (dropId) => overlay.clear(dropId));
   connection.on('muted', () => broadcastState());
 
+  updater.onChange(broadcastState);
+  updater.init();
+
   renderTray();
 
   if (store.get().token) {
@@ -205,6 +231,10 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('app:preview', () => overlay.preview());
+
+  ipcMain.handle('app:checkUpdate', () => updater.check());
+
+  ipcMain.handle('app:applyUpdate', () => updater.apply());
 
   ipcMain.handle('app:quit', () => {
     quitting = true;

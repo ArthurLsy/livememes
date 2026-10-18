@@ -42,7 +42,10 @@ L'overlay ne bloque jamais un clic : la souris le traverse.
 ## Connu
 
 - L'app porte encore l'icone Electron par defaut.
-- Pas de mise a jour automatique : il faudra reinstaller depuis la prochaine
-  release.
+- Mises a jour automatiques sur Windows (installeur) et Linux (AppImage) :
+  l'app telecharge la nouvelle version et propose de redemarrer. Sur macOS et
+  avec le zip Windows, elle signale la nouvelle version, a telecharger a la main.
+  Depuis une version anterieure a cette fonctionnalite, reinstalle une fois a la
+  main.
 - Un jeu en mode video exclusif (plein ecran natif) peut passer devant
   l'overlay. Le mode fenetre sans bordure marche toujours.

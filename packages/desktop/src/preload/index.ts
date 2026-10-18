@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('livememes', {
   unlink: () => ipcRenderer.invoke('app:unlink'),
   setSettings: (patch: Record<string, unknown>) => ipcRenderer.invoke('app:setSettings', patch),
   preview: () => ipcRenderer.invoke('app:preview'),
+  checkUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  applyUpdate: () => ipcRenderer.invoke('app:applyUpdate'),
   quit: () => ipcRenderer.invoke('app:quit'),
   onState: (handler: (state: unknown) => void) => {
     ipcRenderer.on('app:state', (_event, state) => handler(state));

@@ -62,6 +62,10 @@ body {
   padding: 18px;
 }
 
+.card + .card { margin-top: 12px; }
+
+.card--compact { padding: 14px 18px; }
+
 h2 {
   font-size: 15px;
   margin-bottom: 6px;
@@ -170,6 +174,13 @@ button:disabled { opacity: 0.5; cursor: default; }
   padding: 13px 0;
   border-bottom: 1px solid var(--line);
 }
+
+.row--last {
+  padding: 0;
+  border-bottom: none;
+}
+
+.row--last button { flex: none; }
 
 .row--stack {
   display: block;

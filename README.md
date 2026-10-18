@@ -161,6 +161,40 @@ npm run dist:desktop   # -> packages/desktop/release/
 Cible ta plateforme courante. Les binaires ne sont pas signes : macOS et Windows
 afficheront un avertissement au premier lancement.
 
+### Mises a jour automatiques
+
+Le client verifie les GitHub Releases de `ArthurLsy/livememes` 15 s apres le
+lancement puis toutes les 6 h (electron-updater, config `publish` de
+`packages/desktop/package.json`). L'etat est visible dans les reglages et dans
+le menu de la barre de menus ("Rechercher une mise a jour").
+
+| Installation | Comportement |
+| --- | --- |
+| Windows, installeur NSIS | Telechargement en fond, installation au redemarrage ("Redemarrer pour installer") ou a la fermeture |
+| Linux, AppImage | Idem, l'AppImage est remplacee sur place |
+| macOS, zip Windows | L'app signale la nouvelle version et ouvre la page de release : mise a jour a la main |
+
+macOS reste manuel tant que l'app n'est pas signee et notarisee : Squirrel.Mac
+refuse d'installer une app non signee. Une version beta (`x.y.z-beta.n`) recoit
+les prereleases ; une version stable ne recoit que les releases stables.
+
+Un echec (reseau, release sans fichier `latest*.yml`, binaire dont le sha512 ne
+correspond pas) s'affiche dans les reglages et laisse l'app tourner sur sa
+version courante. Le serveur et le client se mettent a jour independamment :
+un client pas encore redemarre doit rester compatible (`PROTOCOL_VERSION`).
+
+### Publier une release
+
+1. Monte `version` dans `package.json` (racine et `packages/desktop`).
+2. Commit, puis `git tag vX.Y.Z[-beta.N] && git push origin vX.Y.Z[-beta.N]`.
+3. Le workflow `release` verifie, construit les trois plateformes et attache a
+   la release les binaires, les `latest*.yml` et les `.blockmap`. Sans ces `.yml`,
+   aucun client ne voit la mise a jour.
+4. Verifie la release sur GitHub et complete `.github/RELEASE_NOTES.md` si besoin.
+
+Le depot doit etre public : electron-updater lit les releases sans
+authentification.
+
 ## Tests
 
 ```bash

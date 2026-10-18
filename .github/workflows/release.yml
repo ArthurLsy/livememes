@@ -102,5 +102,13 @@ jobs:
             echo "aucun binaire produit" >&2
             exit 1
           fi
+          # Fichiers lus par electron-updater : latest.yml, latest-mac.yml et
+          # latest-linux.yml (meme pour une beta : l'updater cherche d'abord
+          # beta*.yml puis se replie sur latest*.yml), plus les .blockmap pour
+          # le telechargement differentiel. builder-debug.yml est un fichier de
+          # diagnostic, pas un canal.
+          for f in packages/desktop/release/*.yml packages/desktop/release/*.blockmap; do
+            [ "$(basename "$f")" = builder-debug.yml ] || FILES+=("$f")
+          done
           printf 'a publier : %s\n' "${FILES[@]}"
           gh release upload "${GITHUB_REF_NAME}" "${FILES[@]}" --clobber
