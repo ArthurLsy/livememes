@@ -72,6 +72,7 @@ export function createApp(): express.Express {
 
     res.type(found.contentType);
     res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.sendFile(found.file);
   });
 

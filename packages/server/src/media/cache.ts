@@ -1,9 +1,15 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import { createHash } from 'node:crypto';
 import type { MemeKind } from '@livememes/shared';
 import { config } from '../config.ts';
+import { MediaError } from './errors.ts';
+import { safeGet, type FetchPolicy } from './fetch.ts';
+import { SNIFF_BYTES, matchesSignature } from './sniff.ts';
+
+export { MediaError };
 
 const mediaDir = path.join(config.dataDir, 'media');
 fs.mkdirSync(mediaDir, { recursive: true });
@@ -33,8 +39,6 @@ export interface CachedMedia {
   url: string;
 }
 
-export class MediaError extends Error {}
-
 const index = new Map<string, { file: string; contentType: string; kind: MemeKind }>();
 
 function humanBytes(n: number): string {
@@ -46,18 +50,10 @@ function humanBytes(n: number): string {
  *
  * Indispensable : les URLs du CDN Discord sont signees et expirent, et les
  * overlays ne doivent pas dependre de la disponibilite d'un hote tiers.
+ *
+ * `policy` ne sert qu'aux tests (autoriser un serveur local).
  */
-export async function ingest(sourceUrl: string): Promise<CachedMedia> {
-  let parsed: URL;
-  try {
-    parsed = new URL(sourceUrl);
-  } catch {
-    throw new MediaError("Ce n'est pas une URL valide.");
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new MediaError('Seules les URLs http(s) sont acceptees.');
-  }
-
+export async function ingest(sourceUrl: string, policy?: FetchPolicy): Promise<CachedMedia> {
   const id = createHash('sha256').update(sourceUrl).digest('base64url').slice(0, 22);
   const hit = index.get(id);
   if (hit && fs.existsSync(hit.file)) {
@@ -66,54 +62,66 @@ export async function ingest(sourceUrl: string): Promise<CachedMedia> {
     return { id, kind: hit.kind, contentType: hit.contentType, bytes: stat.size, url: publicUrlFor(id) };
   }
 
-  const response = await fetch(parsed, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(config.media.fetchTimeoutMs),
-    headers: { 'user-agent': 'livememes/0.1 (+https://github.com/livememes)' },
-  }).catch((cause: unknown) => {
-    throw new MediaError(`Impossible de telecharger le media (${(cause as Error).message}).`);
-  });
+  const response = await safeGet(sourceUrl, policy);
+  const { contentType } = response;
 
-  if (!response.ok) {
+  if (response.status < 200 || response.status >= 300) {
+    response.body.destroy();
     throw new MediaError(`Le serveur distant a repondu ${response.status}.`);
   }
 
-  const contentType = (response.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
   const allowed = ALLOWED[contentType];
   if (!allowed) {
+    response.body.destroy();
     throw new MediaError(
       `Type de fichier non supporte (${contentType || 'inconnu'}). Images, GIFs et videos courtes uniquement.`,
     );
   }
 
-  const declared = Number(response.headers.get('content-length') ?? '0');
+  const declared = response.contentLength;
   if (declared > config.media.maxBytes) {
+    response.body.destroy();
     throw new MediaError(`Fichier trop lourd (${humanBytes(declared)}, max ${humanBytes(config.media.maxBytes)}).`);
   }
 
   const file = path.join(mediaDir, `${id}.${allowed.ext}`);
-  const bytes = await streamToFile(response, file);
+  const bytes = await streamToFile(response.body, contentType, file);
 
   index.set(id, { file, contentType, kind: allowed.kind });
   return { id, kind: allowed.kind, contentType, bytes, url: publicUrlFor(id) };
 }
 
-/** Ecrit le corps sur disque en coupant des que la taille max est depassee. */
-async function streamToFile(response: Response, file: string): Promise<number> {
-  const body = response.body;
-  if (!body) throw new MediaError('Reponse vide.');
+const DISGUISED_MESSAGE = "Le contenu du fichier ne correspond pas a son type annonce.";
 
+/**
+ * Ecrit le corps sur disque en coupant des que la taille max est depassee, et
+ * verifie la signature des premiers octets contre le type annonce.
+ */
+async function streamToFile(body: Readable, contentType: string, file: string): Promise<number> {
   const handle = await fsp.open(file, 'w');
   let written = 0;
+  let head: Buffer | null = Buffer.alloc(0); // null une fois la signature validee
   try {
-    for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
+    for await (const chunk of body as AsyncIterable<Buffer>) {
       written += chunk.byteLength;
       if (written > config.media.maxBytes) {
         throw new MediaError(`Fichier trop lourd (max ${humanBytes(config.media.maxBytes)}).`);
       }
+      if (head) {
+        head = Buffer.concat([head, chunk]);
+        if (head.length >= SNIFF_BYTES) {
+          if (!matchesSignature(contentType, head)) throw new MediaError(DISGUISED_MESSAGE);
+          head = null;
+        }
+      }
       await handle.write(chunk);
     }
+    // Fichier plus court que SNIFF_BYTES : on tranche sur ce qu'on a.
+    if (head && written > 0 && !matchesSignature(contentType, head)) {
+      throw new MediaError(DISGUISED_MESSAGE);
+    }
   } catch (error) {
+    body.destroy();
     await handle.close();
     await fsp.rm(file, { force: true });
     throw error instanceof MediaError ? error : new MediaError('Telechargement interrompu.');
@@ -149,30 +157,31 @@ export function resolve(id: string): { file: string; contentType: string } | nul
   return { file, contentType: entry[0] };
 }
 
-/** Purge les medias non consultes depuis MEDIA_TTL_HOURS. */
-export function startCleanup(): void {
-  const sweep = async () => {
-    const cutoff = Date.now() - config.media.ttlMs;
-    let names: string[];
+/** Supprime les medias non consultes depuis MEDIA_TTL_HOURS. */
+export async function purgeExpired(): Promise<void> {
+  const cutoff = Date.now() - config.media.ttlMs;
+  let names: string[];
+  try {
+    names = await fsp.readdir(mediaDir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    const file = path.join(mediaDir, name);
     try {
-      names = await fsp.readdir(mediaDir);
-    } catch {
-      return;
-    }
-    for (const name of names) {
-      const file = path.join(mediaDir, name);
-      try {
-        const stat = await fsp.stat(file);
-        if (stat.mtimeMs < cutoff) {
-          await fsp.rm(file, { force: true });
-          index.delete(path.basename(name, path.extname(name)));
-        }
-      } catch {
-        // fichier deja parti : rien a faire
+      const stat = await fsp.stat(file);
+      if (stat.mtimeMs < cutoff) {
+        await fsp.rm(file, { force: true });
+        index.delete(path.basename(name, path.extname(name)));
       }
+    } catch {
+      // fichier deja parti : rien a faire
     }
-  };
+  }
+}
 
-  void sweep();
-  setInterval(() => void sweep(), 30 * 60 * 1000).unref();
+/** Purge au demarrage puis toutes les 30 min. */
+export function startCleanup(): void {
+  void purgeExpired();
+  setInterval(() => void purgeExpired(), 30 * 60 * 1000).unref();
 }

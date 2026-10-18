@@ -33,6 +33,8 @@ services:
       DISCORD_DEV_GUILD_ID: ${DISCORD_DEV_GUILD_ID:-}
       # Role requis pour envoyer et recevoir des memes. Vide = tout le monde.
       DROP_ROLE_ID: ${DROP_ROLE_ID:-}
+      # Domaines autorises pour les medias (virgules). Vide = tout domaine public.
+      MEDIA_ALLOWED_HOSTS: ${MEDIA_ALLOWED_HOSTS:-}
 
       MEDIA_MAX_BYTES: ${MEDIA_MAX_BYTES:-26214400}
       MEDIA_TTL_HOURS: ${MEDIA_TTL_HOURS:-24}

@@ -55,6 +55,11 @@ export const config = {
     /** Duree de conservation du cache disque. */
     ttlMs: int('MEDIA_TTL_HOURS', 24) * 60 * 60 * 1000,
     fetchTimeoutMs: int('MEDIA_FETCH_TIMEOUT_MS', 10_000),
+    /** Domaines autorises (sous-domaines compris). Vide : tout domaine public. */
+    allowedHosts: (process.env.MEDIA_ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((host) => host.trim().toLowerCase().replace(/^\./, ''))
+      .filter(Boolean),
   },
 
   drops: {
