@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { ChatInputCommandInteraction, GuildMember, VoiceBasedChannel } from 'discord.js';
-import { MEME_SIZES, type MemeDrop, type MemePosition, type MemeSize } from '@livememes/shared';
+import { MEME_SIZES, type MemeDrop, type MemeKind, type MemePosition, type MemeSize } from '@livememes/shared';
 import { config } from '../config.ts';
 import * as media from '../media/cache.ts';
 import * as hub from '../realtime/hub.ts';
@@ -58,7 +58,8 @@ export function audienceOf(channel: VoiceBasedChannel): GuildMember[] {
 
 export interface BuildOptions {
   sourceUrl: string;
-  durationMs: number;
+  /** Duree demandee via l'option `duree`, null pour la valeur par defaut. */
+  durationMs: number | null;
   position: MemePosition;
   size: MemeSize;
   volume: number;
@@ -72,6 +73,23 @@ export interface DeliveryReport {
   offline: string[];
   muted: string[];
   screens: number;
+}
+
+/**
+ * Duree d'affichage selon le type de media. Une image (GIF compris) reste
+ * `durationMs` ; une video est jouee jusqu'a la fin, sous un plafond qui vaut
+ * la duree demandee si l'utilisateur en a donne une.
+ */
+export function resolveDuration(
+  kind: MemeKind,
+  requestedMs: number | null,
+): Pick<MemeDrop, 'durationMs' | 'maxDurationMs'> {
+  const durationMs = Math.min(requestedMs ?? config.drops.defaultDurationMs, config.drops.maxDurationMs);
+  if (kind !== 'video') return { durationMs };
+  return {
+    durationMs,
+    maxDurationMs: Math.min(requestedMs ?? config.drops.maxVideoDurationMs, config.drops.maxVideoDurationMs),
+  };
 }
 
 /**
@@ -89,7 +107,7 @@ export async function deliver(
     id: randomUUID(),
     url: cached.url,
     kind: cached.kind,
-    durationMs: options.durationMs,
+    ...resolveDuration(cached.kind, options.durationMs),
     position: options.position,
     scale: MEME_SIZES[options.size],
     volume: options.volume,

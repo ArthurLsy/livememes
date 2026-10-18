@@ -43,6 +43,13 @@ export interface MemeDrop {
   kind: MemeKind;
   /** Duree d'affichage, animations d'entree/sortie comprises. */
   durationMs: number;
+  /**
+   * Videos uniquement : la video est jouee une fois jusqu'a la fin, ce plafond
+   * ne sert que de filet de securite (video bloquee, trop longue). Absent, un
+   * overlay applique `durationMs`. Champ optionnel : les overlays qui ne le
+   * connaissent pas gardent l'ancien comportement (boucle pendant `durationMs`).
+   */
+  maxDurationMs?: number;
   position: MemePosition;
   /** Hauteur cible, en fraction de la hauteur de l'ecran (0-1). */
   scale: number;

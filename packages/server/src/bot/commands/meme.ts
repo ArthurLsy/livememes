@@ -23,9 +23,11 @@ function withDisplayOptions(sub: SlashCommandSubcommandBuilder): SlashCommandSub
     .addIntegerOption((option) =>
       option
         .setName('duree')
-        .setDescription(`Duree d'affichage en secondes (max ${config.drops.maxDurationMs / 1000})`)
+        .setDescription(
+          `Duree d'affichage en secondes (max ${config.drops.maxDurationMs / 1000}). Videos : jouees en entier par defaut`,
+        )
         .setMinValue(1)
-        .setMaxValue(Math.floor(config.drops.maxDurationMs / 1000)),
+        .setMaxValue(Math.floor(Math.max(config.drops.maxDurationMs, config.drops.maxVideoDurationMs) / 1000)),
     )
     .addStringOption((option) =>
       option
@@ -164,11 +166,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     return;
   }
 
+  // Le plafonnement depend du type de media, connu seulement apres ingestion.
   const durationSeconds = interaction.options.getInteger('duree');
-  const durationMs = Math.min(
-    durationSeconds ? durationSeconds * 1000 : config.drops.defaultDurationMs,
-    config.drops.maxDurationMs,
-  );
+  const durationMs = durationSeconds ? durationSeconds * 1000 : null;
 
   const position = (interaction.options.getString('position') ?? 'center') as MemePosition;
   const size = (interaction.options.getString('taille') ?? 'medium') as MemeSize;
