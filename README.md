@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="livememes-logo/svg/livememes-logo-dark.svg" />
+    <img src="livememes-logo/svg/livememes-logo-light.svg" alt="LiveMemes" width="360" />
+  </picture>
+</p>
+
 # LiveMemes
 
 Balance un meme depuis Discord, il s'affiche **en plein ecran chez tous les membres
