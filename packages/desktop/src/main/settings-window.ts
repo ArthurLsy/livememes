@@ -15,7 +15,9 @@ export function open(): BrowserWindow {
     height: 740,
     resizable: false,
     title: 'LiveMemes',
-    backgroundColor: '#0e0f13',
+    backgroundColor: '#0d1226',
+    // Ignore sur macOS (icone du bundle), utilise par Windows et Linux.
+    icon: path.join(__dirname, '../../assets/icon.png'),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.cjs'),

@@ -1,6 +1,6 @@
 {
   "name": "@livememes/desktop",
-  "version": "0.1.0-beta.3",
+  "version": "0.1.0-beta.4",
   "private": true,
   "description": "Overlay LiveMemes",
   "author": "ArthurLsy",
@@ -29,6 +29,7 @@
   "build": {
     "appId": "app.livememes.overlay",
     "productName": "LiveMemes",
+    "icon": "assets/icon.png",
     "files": ["dist/**/*", "assets/**/*"],
     "directories": { "output": "release" },
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",

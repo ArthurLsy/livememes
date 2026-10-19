@@ -1,12 +1,12 @@
 :root {
-  --bg: #0e0f13;
-  --card: #171922;
-  --line: #262a37;
-  --text: #eef0f6;
-  --muted: #8b91a5;
-  --accent: #5b6cff;
-  --danger: #ff5f6d;
-  --ok: #3ddc84;
+  --bg: #0d1226;
+  --card: #151b33;
+  --line: #252d4d;
+  --text: #eef1ff;
+  --muted: #8d94b8;
+  --accent: #6c5cff;
+  --danger: #ff4d4d;
+  --ok: #c8ff3a;
 }
 
 * {
@@ -31,9 +31,8 @@ body {
 }
 
 .logo {
-  font-weight: 700;
-  font-size: 17px;
-  letter-spacing: -0.2px;
+  display: block;
+  height: 24px;
 }
 
 .status {
@@ -77,7 +76,7 @@ h2 {
 }
 
 code {
-  background: #232734;
+  background: #1d2440;
   padding: 1px 6px;
   border-radius: 5px;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -99,7 +98,7 @@ code {
 input[type='text'] {
   width: 100%;
   padding: 10px 12px;
-  background: #0f111a;
+  background: #0a0e1e;
   border: 1px solid var(--line);
   border-radius: 9px;
   color: var(--text);
@@ -124,7 +123,7 @@ button {
   padding: 10px 16px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: #212533;
+  background: #1b2240;
   color: var(--text);
   font: 600 13px/1 inherit;
   cursor: pointer;
@@ -161,7 +160,7 @@ button:disabled { opacity: 0.5; cursor: default; }
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: #232734;
+  background: #1d2440;
 }
 
 .user__name { font-weight: 600; }
@@ -194,7 +193,7 @@ button:disabled { opacity: 0.5; cursor: default; }
   height: 23px;
   flex: none;
   border-radius: 999px;
-  background: #313648;
+  background: #2c3558;
   position: relative;
   cursor: pointer;
   transition: background 150ms;
@@ -229,7 +228,7 @@ input[type='range'] {
 input[type='range']::-webkit-slider-runnable-track {
   height: 5px;
   border-radius: 999px;
-  background: #313648;
+  background: #2c3558;
 }
 
 input[type='range']::-webkit-slider-thumb {
@@ -293,7 +292,7 @@ button.small {
   gap: 6px;
   margin-top: 10px;
   padding: 10px 12px;
-  background: #0f111a;
+  background: #0a0e1e;
   border: 1px solid var(--line);
   border-radius: 9px;
   font-size: 13px;

@@ -17,6 +17,7 @@ if (!app.requestSingleInstanceLock()) {
 // Sans fenetre visible dans le dock, l'app se pilote uniquement depuis la barre de menus.
 app.dock?.hide();
 
+const ASSETS = path.join(__dirname, '../../assets');
 const connection = new Connection();
 let tray: Tray | null = null;
 let lastStatus: ConnectionStatus = 'offline';
@@ -179,10 +180,11 @@ app.whenReady().then(() => {
   store.load();
   overlay.init();
 
-  const icon = nativeImage
-    .createFromPath(path.join(__dirname, '../../assets/tray.png'))
-    .resize({ width: 16, height: 16 });
-  icon.setTemplateImage(true);
+  // macOS : silhouette "Template" que le systeme recolore selon le theme.
+  // Ailleurs : version couleur. Les variantes @2x sont chargees automatiquement.
+  const isMac = process.platform === 'darwin';
+  const icon = nativeImage.createFromPath(path.join(ASSETS, isMac ? 'trayTemplate.png' : 'tray.png'));
+  if (isMac) icon.setTemplateImage(true);
   tray = new Tray(icon);
   tray.on('click', () => settingsWindow.open());
 

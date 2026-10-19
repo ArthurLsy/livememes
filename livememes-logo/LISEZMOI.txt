@@ -1,0 +1,36 @@
+LiveMemes - kit logo
+====================
+
+SVG (dossier svg/) : fichiers vectoriels. Ils s'agrandissent sans perte et ne
+dependent d'aucune police (le texte est deja converti en courbes). Ils
+s'ouvrent dans un navigateur, Figma, Inkscape, Illustrator...
+
+  livememes-logo-dark.svg    logo horizontal, pour fonds sombres
+  livememes-logo-light.svg   logo horizontal, pour fonds clairs
+  livememes-mark.svg         la bulle seule (avatar, favicon, petits espaces)
+  livememes-icon.svg         icone d'appli : carre arrondi bleu nuit + bulle
+  tray-template.svg          silhouette noire pour la barre de menus macOS
+
+PNG (dossier png/) : les memes visuels deja exportes.
+
+  icon-1024.png, icon-512.png     icone d'appli (512 convient aussi pour
+                                  l'avatar du bot Discord)
+  livememes-mark-512.png          bulle seule, fond transparent
+  trayTemplate.png / @2x.png      barre de menus macOS (22 et 44 px). Le mot
+                                  "Template" dans le nom dit a macOS d'adapter
+                                  la couleur au theme clair ou sombre.
+  tray-color.png / @2x.png        version couleur (32 et 64 px) pour Windows
+                                  et Linux
+  livememes-logo-*-1600.png       logos horizontaux, 1600 px de large
+
+Utilisation rapide
+  - Dans une page HTML : <img src="livememes-mark.svg" width="48">
+  - Electron (tray) : new Tray(chemin_vers/trayTemplate.png) sur macOS,
+    tray-color.png ailleurs.
+  - Icone de l'appli desktop : icon-1024.png (electron-builder en tire les
+    formats .icns et .ico).
+
+Palette
+  Bleu nuit  #0D1226    Violet  #6C5CFF    Vert acide  #C8FF3A
+  Rouge live #FF4D4D    Papier  #EEF1FF    Violet fonce (texte sur clair) #5B49F0
+Police du texte : Unbounded Bold (licence libre SIL OFL).
