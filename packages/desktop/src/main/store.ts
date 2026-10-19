@@ -25,6 +25,8 @@ export interface Settings {
    */
   displays: DisplayChoice;
   launchAtLogin: boolean;
+  /** Appareil deja lie au moins une fois : le tutoriel saute alors la bienvenue. */
+  onboarded: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -34,6 +36,7 @@ const DEFAULTS: Settings = {
   muted: false,
   displays: 'primary',
   launchAtLogin: false,
+  onboarded: false,
 };
 
 let file: string;
@@ -48,6 +51,8 @@ export function load(): Settings {
     cache = { ...DEFAULTS, ...raw };
     // Reprise de l'ancien booleen allDisplays (versions <= 0.1.0-beta.1).
     if (raw.displays === undefined && allDisplays) cache.displays = 'all';
+    // Installations anterieures au tutoriel : un token prouve un appairage passe.
+    if (raw.onboarded === undefined) cache.onboarded = Boolean(raw.token);
   } catch {
     cache = { ...DEFAULTS };
   }

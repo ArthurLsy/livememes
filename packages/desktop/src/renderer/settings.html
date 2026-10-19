@@ -16,20 +16,104 @@
     </header>
 
     <main>
-      <!-- Vue non lie : appairage -->
-      <section class="card" id="pairCard" hidden>
-        <h2>Connecte ton compte Discord</h2>
-        <p class="muted">
-          Dans Discord, tape <code>/livememes link</code>. Le bot te donne un code a coller ici.
-        </p>
+      <!-- Tutoriel : affiche tant que l'appareil n'est pas lie, ou rouvert depuis les reglages -->
+      <section class="card tutorial" id="tutorial" hidden>
+        <div class="steps" id="stepDots"></div>
 
-        <label class="field">
-          <span>Code d'appairage</span>
-          <input id="code" type="text" maxlength="9" spellcheck="false" autocomplete="off" placeholder="A1B2C3D4" />
-        </label>
+        <div class="step" data-step="welcome">
+          <p class="step__kicker">Bienvenue</p>
+          <h2>Des memes en plein ecran, envoyes depuis Discord</h2>
+          <p class="muted">
+            Quand quelqu'un de ton salon vocal envoie un meme avec <code>/meme</code>, il s'affiche
+            ici, par-dessus ton jeu ou ton navigateur, sans jamais bloquer un clic.
+          </p>
+          <p class="muted">
+            Pour ca, l'app doit savoir qui tu es sur Discord. Ca prend une minute.
+          </p>
+        </div>
 
-        <p class="error" id="pairError" hidden></p>
-        <button class="primary" id="pairButton">Connecter</button>
+        <div class="step" data-step="discord">
+          <p class="step__kicker">Dans Discord</p>
+          <h2>Demande un code au bot</h2>
+          <p class="notice" id="revokedNotice" hidden></p>
+          <ol class="howto">
+            <li>Ouvre n'importe quel salon textuel du serveur ou le bot LiveMemes est present.</li>
+            <li>Tape <code>/livememes link</code> puis choisis la commande dans la liste et valide.</li>
+            <li>Le bot repond avec un code. Ce message n'est visible que par toi.</li>
+          </ol>
+
+          <div class="mock" aria-hidden="true">
+            <div class="mock__msg">
+              <div class="mock__avatar"></div>
+              <div>
+                <div class="mock__author">LiveMemes <span class="mock__tag">APP</span></div>
+                <div><strong>Connecte ton overlay</strong></div>
+                <div>Code : <code>K7XQ4MPA</code></div>
+                <div class="mock__eph">Visible uniquement par toi</div>
+              </div>
+            </div>
+            <div class="mock__input"><span class="mock__cmd">/livememes link</span></div>
+          </div>
+        </div>
+
+        <div class="step" data-step="code">
+          <p class="step__kicker">Dans l'app</p>
+          <h2>Colle le code ici</h2>
+
+          <div id="pairForm">
+            <p class="muted">
+              Copie le code du message du bot et colle-le ci-dessous.
+              <strong>Il expire au bout de quelques minutes</strong> (l'heure limite est dans
+              le message) : s'il est perime, refais simplement <code>/livememes link</code>.
+            </p>
+
+            <label class="field">
+              <span>Code d'appairage</span>
+              <input id="code" type="text" maxlength="16" spellcheck="false" autocomplete="off" placeholder="XXXXXXXX" />
+            </label>
+
+            <p class="error" id="pairError" hidden></p>
+            <button class="primary" id="pairButton">Connecter</button>
+          </div>
+
+          <p class="muted" id="alreadyLinked" hidden>
+            Cet appareil est deja lie a ton compte : rien a faire ici.
+          </p>
+        </div>
+
+        <div class="step" data-step="done">
+          <p class="step__kicker">C'est lie</p>
+          <div class="user user--plain">
+            <img id="doneAvatar" class="avatar" alt="" />
+            <div>
+              <div class="muted">Connecte en tant que</div>
+              <div class="user__name" id="doneUsername"></div>
+            </div>
+          </div>
+          <p class="muted">
+            Verifie que tout s'affiche bien : le meme de test n'apparait que sur ton ecran.
+          </p>
+          <button class="primary" id="testButton">Envoyer un meme de test</button>
+        </div>
+
+        <div class="step" data-step="tips">
+          <p class="step__kicker">Pour aller plus loin</p>
+          <h2>Tout se passe dans un salon vocal</h2>
+          <ul class="howto">
+            <li>
+              Rejoins un <strong>salon vocal</strong> : tu recois les memes des personnes presentes,
+              et les tiens partent vers elles.
+            </li>
+            <li><code>/meme url</code> ou <code>/meme fichier</code> envoie un meme a tout le salon.</li>
+            <li><code>/livememes mute</code> coupe la reception, la barre de menus aussi.</li>
+            <li>L'app reste dans la barre de menus : fermer cette fenetre ne l'arrete pas.</li>
+          </ul>
+        </div>
+
+        <div class="tutorial__nav">
+          <button id="backButton">Retour</button>
+          <button class="accent" id="nextButton">Suivant</button>
+        </div>
       </section>
 
       <!-- Vue liee : reglages -->
@@ -81,6 +165,8 @@
           <button id="previewButton">Apercu</button>
           <button class="danger" id="unlinkButton">Delier cet appareil</button>
         </div>
+
+        <button class="link" id="tutorialButton">Revoir le tutoriel</button>
       </section>
 
       <!-- Version et mises a jour : visible lie ou non -->

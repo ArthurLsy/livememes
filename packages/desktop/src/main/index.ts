@@ -2,6 +2,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { app, ipcMain, Menu, nativeImage, screen, shell, Tray, type MenuItemConstructorOptions } from 'electron';
 import type { PairResponse } from '@livememes/shared';
+import { pairErrorMessage } from '../renderer/onboarding.ts';
 import * as store from './store.ts';
 import * as overlay from './overlay.ts';
 import * as settingsWindow from './settings-window.ts';
@@ -39,6 +40,7 @@ function appState() {
     displays: settings.displays,
     displayList: overlay.listDisplays(),
     launchAtLogin: settings.launchAtLogin,
+    onboarded: settings.onboarded,
     status: lastStatus,
     detail: lastDetail,
     updater: updater.status(),
@@ -157,16 +159,16 @@ async function pair(code: string): Promise<{ ok: true } | { ok: false; error: st
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    return { ok: false, error: "Serveur injoignable. Verifie l'adresse et ta connexion." };
+    return { ok: false, error: 'Serveur injoignable. Verifie ta connexion internet et reessaie.' };
   }
 
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { error?: string };
-    return { ok: false, error: body.error ?? `Le serveur a repondu ${response.status}.` };
+    return { ok: false, error: pairErrorMessage(response.status, body.error) };
   }
 
   const data = (await response.json()) as PairResponse;
-  store.update({ token: data.token, user: data.user });
+  store.update({ token: data.token, user: data.user, onboarded: true });
   connection.restart();
   broadcastState();
   return { ok: true };
@@ -189,9 +191,13 @@ app.whenReady().then(() => {
   tray.on('click', () => settingsWindow.open());
 
   connection.on('status', (status, detail) => {
+    const revoked = status === 'unauthorized' && lastStatus !== 'unauthorized' && !store.get().token;
     lastStatus = status;
     lastDetail = detail;
     broadcastState();
+    // Token refuse ou appareil delie depuis Discord : le tutoriel reprend a
+    // l'etape /livememes link, encore faut-il que la fenetre soit ouverte.
+    if (revoked) settingsWindow.open();
   });
   connection.on('drop', (drop) => overlay.show(drop));
   connection.on('clear', (dropId) => overlay.clear(dropId));
