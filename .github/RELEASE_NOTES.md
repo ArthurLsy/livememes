@@ -3,12 +3,14 @@ tous les membres de ton salon vocal.
 
 ## Nouveau dans cette version
 
-- Les videos sont jouees une fois, jusqu'a la fin (60 s max), au lieu de boucler
-  ou d'etre coupees.
-- Plusieurs memes d'affilee s'affichent l'un apres l'autre au lieu de se
-  superposer.
-- Choix des ecrans d'affichage dans les reglages, avec un bouton "Identifier".
-- Mises a jour automatiques (voir plus bas).
+- Tutoriel a la premiere ouverture : l'app explique pas a pas comment la lier a
+  ton compte Discord, avec un meme de test a la fin. Il se rouvre depuis les
+  reglages ("Revoir le tutoriel").
+- Messages d'erreur clairs a l'appairage : code invalide ou expire, trop de
+  tentatives, serveur injoignable.
+- Si l'appareil est delie (`/livememes unlink`), l'app se rouvre d'elle-meme sur
+  l'etape `/livememes link`.
+- Logo et icone LiveMemes (arrives en beta 4).
 
 ## Installer
 
@@ -31,9 +33,9 @@ Les binaires ne sont pas signes :
 
 1. Lance l'app. Elle vit dans la barre de menus (macOS) ou la zone de
    notification (Windows), pas dans la barre des taches.
-2. Dans Discord, tape `/livememes link`. Le bot te donne un code.
-3. Colle le code dans l'app. Il n'y a aucune adresse de serveur a renseigner.
-4. Rejoins un salon vocal, puis `/meme url` ou `/meme fichier`.
+2. Suis le tutoriel : dans Discord, tape `/livememes link`, le bot te donne un
+   code a coller dans l'app. Il n'y a aucune adresse de serveur a renseigner.
+3. Rejoins un salon vocal, puis `/meme url` ou `/meme fichier`.
 
 Le meme s'affiche chez tous les membres du vocal qui ont l'app ouverte. Les
 reponses du bot sont privees : personne d'autre que toi ne les voit dans le
@@ -50,7 +52,6 @@ L'overlay ne bloque jamais un clic : la souris le traverse.
 
 ## Connu
 
-- L'app porte encore l'icone Electron par defaut.
 - Mises a jour automatiques sur Windows (installeur) et Linux (AppImage) :
   l'app telecharge la nouvelle version et propose de redemarrer. Sur macOS et
   avec le zip Windows, elle signale la nouvelle version, a telecharger a la main.
