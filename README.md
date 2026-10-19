@@ -69,8 +69,26 @@ L'overlay vise `https://preprod-meme.gowey.fr` par defaut. Pour le brancher sur 
 local, lance-le avec `LIVEMEMES_SERVER=http://localhost:8787 npm run dev:desktop` :
 c'est la seule facon de changer de serveur, l'URL n'est plus saisissable dans l'app.
 
-L'overlay s'ouvre sur l'ecran de reglages. Dans Discord, fais `/livememes link`,
-colle le code, c'est lie.
+### Premiere ouverture : lier l'app a ton compte Discord
+
+Tant que l'appareil n'est pas lie, l'app s'ouvre sur un tutoriel qui reprend ces
+etapes :
+
+1. **Dans Discord** : dans n'importe quel salon textuel du serveur ou le bot est
+   present, tape `/livememes link`. Le bot repond avec un code de 8 caracteres,
+   dans un message visible par toi seul.
+2. **Dans l'app** : colle ce code et valide. Il expire au bout de quelques minutes
+   (5 par defaut, `PAIRING_TTL_MS`) : s'il est perime, refais `/livememes link`.
+   Apres 10 essais rates en 10 minutes, le serveur refuse les tentatives un moment.
+3. **C'est lie** : l'app affiche ton pseudo et propose un meme de test, visible
+   seulement sur ton ecran.
+4. **Ensuite** : rejoins un salon vocal. Tu recois les memes envoyes par les
+   personnes presentes (`/meme url`, `/meme fichier`), et `/livememes mute`
+   coupe la reception.
+
+Le tutoriel se rouvre depuis les reglages ("Revoir le tutoriel"). Si l'appareil
+est delie (`/livememes unlink`, token refuse par le serveur), l'app revient
+d'elle-meme a l'etape `/livememes link`.
 
 Les reglages choisissent ou s'affichent les memes : ecran principal (defaut),
 tous les ecrans, ou une selection. "Identifier" affiche le numero de chaque

@@ -1,4 +1,4 @@
-export {}; // fait de ce fichier un module : requis pour `declare global`.
+import { nextStep, normalizeCode, STEPS, type Step } from './onboarding.ts';
 
 interface AppState {
   serverUrl: string;
@@ -9,6 +9,7 @@ interface AppState {
   displays: 'primary' | 'all' | number[];
   displayList: { id: number; label: string; primary: boolean; active: boolean }[];
   launchAtLogin: boolean;
+  onboarded: boolean;
   status: 'offline' | 'connecting' | 'online' | 'unauthorized';
   detail: string | null;
   updater: {
@@ -41,7 +42,7 @@ declare global {
 
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
-const pairCard = $<HTMLElement>('pairCard');
+const tutorial = $<HTMLElement>('tutorial');
 const linkedCard = $<HTMLElement>('linkedCard');
 const dot = $<HTMLElement>('dot');
 const statusText = $<HTMLElement>('statusText');
@@ -55,6 +56,83 @@ const STATUS: Record<AppState['status'], { label: string; cls: string }> = {
   online: { label: 'Connecte', cls: 'online' },
   unauthorized: { label: 'Non lie', cls: 'error' },
 };
+
+/* -------------------------------------------------------------------------- */
+/* Tutoriel                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** Etape affichee ; null = vue reglages. */
+let step: Step | null = null;
+let wasLinked: boolean | null = null;
+let lastState: AppState | null = null;
+/** true si le tutoriel a ete rouvert depuis les reglages (appareil deja lie). */
+let reopened = false;
+
+const backButton = $<HTMLButtonElement>('backButton');
+const nextButton = $<HTMLButtonElement>('nextButton');
+
+$<HTMLElement>('stepDots').replaceChildren(...STEPS.map(() => document.createElement('span')));
+
+function showStep(next: Step | null): void {
+  step = next;
+  if (lastState) apply(lastState);
+}
+
+function renderTutorial(state: AppState): void {
+  if (step === null) return;
+  const index = STEPS.indexOf(step);
+
+  for (const pane of document.querySelectorAll<HTMLElement>('.step')) {
+    pane.hidden = pane.dataset.step !== step;
+  }
+  [...$<HTMLElement>('stepDots').children].forEach((dot, i) => {
+    dot.className = i === index ? 'current' : i < index ? 'past' : '';
+  });
+
+  // Deconnexion imposee par le serveur : on dit pourquoi on revient ici.
+  const notice = $<HTMLElement>('revokedNotice');
+  notice.hidden = state.linked || state.status !== 'unauthorized' || !state.detail;
+  notice.textContent = `Cet appareil n'est plus lie (${state.detail ?? ''}). Refais l'appairage.`;
+
+  $<HTMLElement>('pairForm').hidden = state.linked;
+  $<HTMLElement>('alreadyLinked').hidden = !state.linked;
+
+  if (state.user) {
+    $<HTMLElement>('doneUsername').textContent = state.user.username;
+    const avatar = $<HTMLImageElement>('doneAvatar');
+    if (state.user.avatarUrl) avatar.src = state.user.avatarUrl;
+  }
+
+  // Juste apres l'appairage, pas de retour vers les etapes qui y menent.
+  backButton.hidden = index === 0 || (step === 'done' && !reopened);
+  // A l'etape du code, c'est "Connecter" qui fait avancer.
+  nextButton.hidden = step === 'code' && !state.linked;
+  nextButton.textContent = step === 'tips' ? 'Terminer' : step === 'welcome' ? 'Commencer' : 'Suivant';
+}
+
+backButton.addEventListener('click', () => {
+  if (step === null) return;
+  showStep(STEPS[STEPS.indexOf(step) - 1] ?? step);
+});
+
+nextButton.addEventListener('click', () => {
+  if (step === null) return;
+  if (step === 'tips') {
+    reopened = false;
+    showStep(null);
+    return;
+  }
+  showStep(STEPS[STEPS.indexOf(step) + 1] ?? null);
+});
+
+$<HTMLButtonElement>('testButton').addEventListener('click', () => {
+  void window.livememes.preview();
+});
+
+$<HTMLButtonElement>('tutorialButton').addEventListener('click', () => {
+  reopened = true;
+  showStep('welcome');
+});
 
 let updateState: AppState['updater']['update']['state'] = 'idle';
 
@@ -137,14 +215,19 @@ function applyDisplays({ displays, displayList }: AppState): void {
 }
 
 function apply(state: AppState): void {
+  lastState = state;
+  step = nextStep(step, wasLinked, state);
+  if (!state.linked) reopened = false;
   applyUpdater(state.updater);
 
-  const status = STATUS[state.status];
+  const status = state.linked ? STATUS[state.status] : STATUS.unauthorized;
   dot.className = `dot ${status.cls}`;
-  statusText.textContent = state.detail && state.status !== 'online' ? state.detail : status.label;
+  statusText.textContent = state.linked && state.detail && state.status !== 'online' ? state.detail : status.label;
 
-  pairCard.hidden = state.linked;
-  linkedCard.hidden = !state.linked;
+  tutorial.hidden = step === null;
+  linkedCard.hidden = step !== null || !state.linked;
+  renderTutorial(state);
+  wasLinked = state.linked;
 
   if (!state.linked) return;
 
@@ -169,13 +252,14 @@ codeInput.addEventListener('keydown', (event) => {
 pairButton.addEventListener('click', () => void submitPair());
 
 async function submitPair(): Promise<void> {
-  const code = codeInput.value.trim().toUpperCase();
+  const check = normalizeCode(codeInput.value);
 
-  if (code.length < 4) {
+  if (!check.ok) {
     pairError.hidden = false;
-    pairError.textContent = 'Entre le code donne par le bot Discord.';
+    pairError.textContent = check.error;
     return;
   }
+  const { code } = check;
 
   pairButton.disabled = true;
   pairButton.textContent = 'Connexion…';
