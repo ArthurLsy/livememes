@@ -1,16 +1,12 @@
-Beta ouverte. Balance un meme depuis Discord, il s'affiche en plein ecran chez
-tous les membres de ton salon vocal.
+Premiere version publique. Balance un meme depuis Discord, il s'affiche en
+plein ecran chez tous les membres de ton salon vocal.
 
 ## Nouveau dans cette version
 
-- Tutoriel a la premiere ouverture : l'app explique pas a pas comment la lier a
-  ton compte Discord, avec un meme de test a la fin. Il se rouvre depuis les
-  reglages ("Revoir le tutoriel").
-- Messages d'erreur clairs a l'appairage : code invalide ou expire, trop de
-  tentatives, serveur injoignable.
-- Si l'appareil est delie (`/livememes unlink`), l'app se rouvre d'elle-meme sur
-  l'etape `/livememes link`.
-- Logo et icone LiveMemes (arrives en beta 4).
+- L'app se connecte au serveur de production. Si tu avais une beta, refais
+  `/livememes link` une fois : les appareils lies sur la beta ne sont pas repris.
+- Tutoriel a la premiere ouverture, choix des ecrans, file d'attente des memes
+  et mises a jour automatiques, issus des betas.
 
 ## Installer
 
