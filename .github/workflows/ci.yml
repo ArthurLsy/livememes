@@ -1,11 +1,12 @@
 name: ci
 
-# Verifie chaque push sur main, puis declenche le deploiement Coolify si tout
-# est vert. Le deploiement automatique de Coolify doit etre coupe : c'est ce
-# workflow qui l'appelle, pour qu'un commit casse n'arrive jamais en prod.
+# Verifie chaque push sur main et preprod, puis declenche le deploiement Coolify
+# de la branche si tout est vert : main -> prod, preprod -> preprod. Le
+# deploiement automatique de Coolify doit etre coupe : c'est ce workflow qui
+# l'appelle, pour qu'un commit casse n'arrive jamais en prod.
 on:
   push:
-    branches: [main]
+    branches: [main, preprod]
   workflow_dispatch:
 
 concurrency:
@@ -33,22 +34,34 @@ jobs:
 
   # Appelle le webhook de deploiement Coolify, uniquement si `verify` est vert.
   # Secrets a creer dans GitHub (Settings > Secrets and variables > Actions) :
-  #   COOLIFY_WEBHOOK : URL "Deploy Webhook" de la ressource (onglet Webhooks)
-  #   COOLIFY_TOKEN   : token API Coolify (Keys & Tokens), permission "deploy"
+  #   preprod : COOLIFY_WEBHOOK / COOLIFY_TOKEN
+  #   prod    : COOLIFY_WEBHOOK_PROD / COOLIFY_TOKEN_PROD
+  # Webhook = URL "Deploy Webhook" de la ressource (onglet Webhooks), token = API
+  # Coolify (Keys & Tokens), permission "deploy". Noms distincts pour la prod :
+  # un secret prod oublie fait echouer le job au lieu de deployer main en preprod.
   deploy:
-    name: deploiement Coolify
+    name: deploiement Coolify (${{ github.ref_name }})
     needs: verify
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/preprod'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Declenche le deploiement
+        # Choix fait en bash et non par `a && b || c` dans l'expression : un
+        # secret prod vide y retomberait sur celui de la preprod.
         env:
-          COOLIFY_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
-          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          PROD_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK_PROD }}
+          PROD_TOKEN: ${{ secrets.COOLIFY_TOKEN_PROD }}
+          PREPROD_WEBHOOK: ${{ secrets.COOLIFY_WEBHOOK }}
+          PREPROD_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
         run: |
+          if [ "$GITHUB_REF_NAME" = main ]; then
+            COOLIFY_WEBHOOK="$PROD_WEBHOOK" COOLIFY_TOKEN="$PROD_TOKEN"
+          else
+            COOLIFY_WEBHOOK="$PREPROD_WEBHOOK" COOLIFY_TOKEN="$PREPROD_TOKEN"
+          fi
           if [ -z "$COOLIFY_WEBHOOK" ] || [ -z "$COOLIFY_TOKEN" ]; then
-            echo "::error::Secrets COOLIFY_WEBHOOK et COOLIFY_TOKEN manquants : rien n'a ete deploye."
+            echo "::error::Secrets Coolify manquants pour ${GITHUB_REF_NAME} : rien n'a ete deploye."
             exit 1
           fi
           # Coolify n'accepte plus que POST sur ce webhook (GET -> 405).
