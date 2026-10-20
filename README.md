@@ -11,6 +11,10 @@ Balance un meme depuis Discord, il s'affiche **en plein ecran chez tous les memb
 du salon vocal** — par-dessus le jeu, le navigateur, n'importe quoi. Dans l'esprit
 de MemeDrop.
 
+<p align="center">
+  <img src="docs/captures/overlay.png" alt="Un meme affiche par l'overlay, avec sa legende et son auteur" width="640" />
+</p>
+
 ```
 /meme gif recherche:chat qui tape au clavier
         │
@@ -86,7 +90,7 @@ etapes :
    personnes presentes (`/meme url`, `/meme fichier`), et `/livememes mute`
    coupe la reception.
 
-Le tutoriel se rouvre depuis les reglages ("Revoir le tutoriel"). Si l'appareil
+Le tutoriel se rouvre depuis le bouton "Tutoriel" en haut des reglages. Si l'appareil
 est delie (`/livememes unlink`, token refuse par le serveur), l'app revient
 d'elle-meme a l'etape `/livememes link`.
 
@@ -94,6 +98,11 @@ Les reglages choisissent ou s'affichent les memes : ecran principal (defaut),
 tous les ecrans, ou une selection. "Identifier" affiche le numero de chaque
 ecran. Un ecran choisi puis debranche est ignore ; si aucun ecran choisi n'est
 branche, l'overlay retombe sur l'ecran principal.
+
+<p align="center">
+  <img src="docs/captures/reglages.png" alt="Fenetre de reglages" width="300" />
+  <img src="docs/captures/tutoriel.png" alt="Premiere etape du tutoriel" width="300" />
+</p>
 
 > **`PUBLIC_URL` compte.** C'est l'URL que les overlays utilisent pour telecharger
 > les medias. En `localhost`, seuls les overlays de ta propre machine verront
@@ -169,6 +178,14 @@ alors un plafond, et `DROP_MAX_VIDEO_DURATION_MS` (60 s par defaut) coupe les
 videos plus longues. Images et GIF restent affiches pendant `duree`
 (`DROP_DEFAULT_DURATION_MS`, plafonne par `DROP_MAX_DURATION_MS`).
 
+Une croix discrete en haut a droite de chaque meme le ferme d'un clic, sur ton
+ecran seulement : les autres membres du vocal le gardent, et le suivant de la
+file prend sa place. Hors de la croix, la souris traverse toujours l'overlay.
+`Ctrl+Alt+Shift+X` (`Cmd+Alt+Shift+X` sur macOS) ou "Fermer les memes affiches"
+dans la barre de menus ferment tout d'un coup. La croix se desactive dans les
+reglages ; elle n'existe pas sous Linux, ou Electron ne sait pas rendre une
+fenetre traversante sensible au survol (le raccourci et le menu marchent).
+
 Plusieurs memes envoyes d'affilee s'affichent l'un apres l'autre, dans l'ordre
 d'arrivee : chaque ecran a sa file de 8 memes en attente. File pleine, les
 nouveaux sont ignores ; un meme qui attend plus de 2 minutes saute.
@@ -200,6 +217,9 @@ npm run dist:desktop   # -> packages/desktop/release/
 
 Cible ta plateforme courante. Les binaires ne sont pas signes : macOS et Windows
 afficheront un avertissement au premier lancement.
+
+La charte graphique (couleurs, polices, composants, visuels d'installeur) est
+decrite dans [`packages/desktop/DESIGN.md`](packages/desktop/DESIGN.md).
 
 ### Mises a jour automatiques
 

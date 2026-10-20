@@ -1,12 +1,19 @@
-Premiere version publique. Balance un meme depuis Discord, il s'affiche en
-plein ecran chez tous les membres de ton salon vocal.
+LiveMemes change de look et apprend a se faire discret. Balance un meme depuis
+Discord, il s'affiche en plein ecran chez tous les membres de ton salon vocal.
+
+![LiveMemes](https://raw.githubusercontent.com/ArthurLsy/livememes/main/docs/captures/overlay.png)
 
 ## Nouveau dans cette version
 
-- L'app se connecte au serveur de production. Si tu avais une beta, refais
-  `/livememes link` une fois : les appareils lies sur la beta ne sont pas repris.
-- Tutoriel a la premiere ouverture, choix des ecrans, file d'attente des memes
-  et mises a jour automatiques, issus des betas.
+- Nouveau design : fenetre de reglages, tutoriel, affichage des memes et
+  installeurs refaits dans la charte LiveMemes.
+- Une croix en haut a droite de chaque meme le ferme d'un clic, chez toi
+  seulement. `Ctrl+Alt+Shift+X` (`Cmd` sur macOS) ou le menu de la barre de
+  menus ferment tout. La croix se desactive dans les reglages (absente sous
+  Linux, ou seul le raccourci marche).
+
+Depuis la 0.1.0, l'installeur Windows et l'AppImage se mettent a jour tout
+seuls : redemarre l'app quand elle le propose.
 
 ## Installer
 

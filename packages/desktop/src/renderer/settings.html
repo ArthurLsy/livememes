@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src https: data: file:; style-src 'unsafe-inline' file:; script-src 'self' file:;"
+      content="default-src 'none'; img-src https: data: file:; font-src file:; style-src 'unsafe-inline' file:; script-src 'self' file:;"
     />
     <title>LiveMemes</title>
     <link rel="stylesheet" href="settings.css" />
@@ -12,8 +12,19 @@
   <body>
     <header class="head">
       <img class="logo" src="logo.svg" alt="LiveMemes" />
-      <div class="status" id="status"><span class="dot" id="dot"></span><span id="statusText">…</span></div>
+      <div class="head__side">
+        <button type="button" class="pill press" id="tutorialButton" hidden>
+          <span class="pill__badge" aria-hidden="true">?</span>
+          <span>Tutoriel</span>
+        </button>
+        <div class="pill status" id="status" role="status">
+          <span class="dot" id="dot"><span class="dot__ping"></span></span>
+          <span class="status__text" id="statusText">…</span>
+        </div>
+      </div>
     </header>
+
+    <p class="notice" id="statusDetail" hidden></p>
 
     <main>
       <!-- Tutoriel : affiche tant que l'appareil n'est pas lie, ou rouvert depuis les reglages -->
@@ -73,7 +84,7 @@
             </label>
 
             <p class="error" id="pairError" hidden></p>
-            <button class="primary" id="pairButton">Connecter</button>
+            <button type="button" class="btn btn--lime btn--block press" id="pairButton">Connecter</button>
           </div>
 
           <p class="muted" id="alreadyLinked" hidden>
@@ -83,8 +94,11 @@
 
         <div class="step" data-step="done">
           <p class="step__kicker">C'est lie</p>
-          <div class="user user--plain">
-            <img id="doneAvatar" class="avatar" alt="" />
+          <div class="user">
+            <span class="avatar" aria-hidden="true">
+              <span class="avatar__initial" id="doneInitial"></span>
+              <img id="doneAvatar" alt="" hidden />
+            </span>
             <div>
               <div class="muted">Connecte en tant que</div>
               <div class="user__name" id="doneUsername"></div>
@@ -93,7 +107,7 @@
           <p class="muted">
             Verifie que tout s'affiche bien : le meme de test n'apparait que sur ton ecran.
           </p>
-          <button class="primary" id="testButton">Envoyer un meme de test</button>
+          <button type="button" class="btn btn--lime btn--block press" id="testButton">Envoyer un meme de test</button>
         </div>
 
         <div class="step" data-step="tips">
@@ -111,73 +125,150 @@
         </div>
 
         <div class="tutorial__nav">
-          <button id="backButton">Retour</button>
-          <button class="accent" id="nextButton">Suivant</button>
+          <button type="button" class="btn press" id="backButton">Retour</button>
+          <button type="button" class="btn btn--accent press" id="nextButton">Suivant</button>
         </div>
       </section>
 
       <!-- Vue liee : reglages -->
-      <section class="card" id="linkedCard" hidden>
-        <div class="user">
-          <img id="avatar" class="avatar" alt="" />
-          <div>
-            <div class="user__name" id="username"></div>
-            <div class="muted" id="serverLabel"></div>
+      <div class="linked" id="linkedCard" hidden>
+        <section class="card hero" id="hero">
+          <span class="avatar avatar--hero" aria-hidden="true">
+            <span class="avatar__initial" id="initial"></span>
+            <img id="avatar" alt="" hidden />
+          </span>
+          <div class="hero__text">
+            <div class="hero__name" id="username"></div>
+            <div class="hero__server" id="serverLabel"></div>
           </div>
-        </div>
+          <svg class="hero__mark" width="108" height="108" viewBox="0 0 120 120" aria-hidden="true">
+            <path class="hero__bubble" d="M40 14 H80 A28 28 0 0 1 108 42 V64 A28 28 0 0 1 80 92 H62 L36 112 L38 92 H40 A28 28 0 0 1 12 64 V42 A28 28 0 0 1 40 14 Z" stroke-width="4" stroke-linejoin="round" />
+            <circle class="hero__feat" cx="44" cy="38" r="5" />
+            <circle class="hero__feat" cx="76" cy="38" r="5" />
+            <rect class="hero__feat eq" x="32" y="52" width="8" height="24" rx="4" />
+            <rect class="hero__feat eq" x="44" y="52" width="8" height="16" rx="4" />
+            <rect class="hero__feat eq" x="56" y="52" width="8" height="12" rx="4" />
+            <rect class="hero__feat eq" x="68" y="52" width="8" height="16" rx="4" />
+            <rect class="hero__feat eq" x="80" y="52" width="8" height="24" rx="4" />
+            <circle class="hero__badge ping" cx="102" cy="20" r="11" />
+            <circle class="hero__badge" cx="102" cy="20" r="11" stroke-width="5" />
+          </svg>
+        </section>
 
-        <div class="row">
-          <div>
-            <div class="row__title">Sourdine</div>
-            <div class="muted">Plus aucun meme ne s'affiche</div>
-          </div>
-          <input type="checkbox" id="muted" class="switch" />
-        </div>
+        <section class="tiles">
+          <button type="button" role="switch" aria-checked="false" class="tile tile--red press" id="muted">
+            <span class="tile__top">
+              <span class="tile__icon">
+                <svg class="icon-on" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" /><path d="M16 9.5l5 5M21 9.5l-5 5" /></svg>
+                <svg class="icon-off" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" /><path d="M15.5 9a4.2 4.2 0 0 1 0 6" /><path d="M18 6.5a8 8 0 0 1 0 11" /></svg>
+              </span>
+              <span class="tile__track"><span class="tile__knob"></span></span>
+            </span>
+            <span class="tile__text">
+              <span class="tile__title">Sourdine</span>
+              <span class="tile__sub">Plus aucun meme ne s'affiche</span>
+            </span>
+          </button>
 
-        <div class="row row--stack">
-          <div class="row__head">
-            <div class="row__title">Ecrans d'affichage</div>
-            <button class="small" id="identifyButton">Identifier</button>
+          <button type="button" role="switch" aria-checked="false" class="tile tile--lime press" id="launchAtLogin">
+            <span class="tile__top">
+              <span class="tile__icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v8" /><path d="M6.6 6.9a8 8 0 1 0 10.8 0" /></svg>
+              </span>
+              <span class="tile__track"><span class="tile__knob"></span></span>
+            </span>
+            <span class="tile__text">
+              <span class="tile__title">Au demarrage</span>
+              <span class="tile__sub">Demarre avec la session</span>
+            </span>
+          </button>
+        </section>
+
+        <button type="button" role="switch" aria-checked="false" class="tile tile--row tile--violet press" id="closeButton">
+          <span class="tile__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
+          </span>
+          <span class="tile__text">
+            <span class="tile__title">Croix de fermeture</span>
+            <span class="tile__sub">Ferme un meme d'un clic, en haut a droite</span>
+          </span>
+          <span class="tile__track"><span class="tile__knob"></span></span>
+        </button>
+
+        <section class="card panel">
+          <div class="panel__head">
+            <h2 id="screensTitle">Ecrans d'affichage</h2>
+            <button type="button" class="btn btn--small press" id="identifyButton">Identifier</button>
           </div>
-          <div class="choices">
-            <label><input type="radio" name="displayMode" value="primary" /> Ecran principal</label>
-            <label><input type="radio" name="displayMode" value="all" /> Tous les ecrans</label>
-            <label><input type="radio" name="displayMode" value="custom" /> Choisir</label>
+          <div class="screens" role="radiogroup" aria-labelledby="screensTitle">
+            <button type="button" role="radio" aria-checked="false" class="screen press" data-mode="primary">
+              <svg width="44" height="26" viewBox="0 0 44 26" aria-hidden="true">
+                <rect class="lit" x="1.5" y="1.5" width="19" height="15" rx="4" stroke-width="3" />
+                <rect class="dim" x="23.5" y="1.5" width="19" height="15" rx="4" stroke-width="3" />
+                <path class="lit" d="M6.5 22.5h9" stroke-width="3" stroke-linecap="round" />
+                <path class="dim" d="M28.5 22.5h9" stroke-width="3" stroke-linecap="round" />
+              </svg>
+              <span>Ecran principal</span>
+            </button>
+            <button type="button" role="radio" aria-checked="false" class="screen press" data-mode="all">
+              <svg width="44" height="26" viewBox="0 0 44 26" aria-hidden="true">
+                <rect class="lit" x="1.5" y="1.5" width="19" height="15" rx="4" stroke-width="3" />
+                <rect class="lit" x="23.5" y="1.5" width="19" height="15" rx="4" stroke-width="3" />
+                <path class="lit" d="M6.5 22.5h9" stroke-width="3" stroke-linecap="round" />
+                <path class="lit" d="M28.5 22.5h9" stroke-width="3" stroke-linecap="round" />
+              </svg>
+              <span>Tous les ecrans</span>
+            </button>
+            <button type="button" role="radio" aria-checked="false" class="screen press" data-mode="custom">
+              <svg width="44" height="26" viewBox="0 0 44 26" aria-hidden="true">
+                <rect class="dim" x="1.5" y="1.5" width="19" height="15" rx="4" stroke-width="3" />
+                <rect class="lit" x="23.5" y="1.5" width="19" height="15" rx="4" stroke-width="3" />
+                <path class="dim" d="M6.5 22.5h9" stroke-width="3" stroke-linecap="round" />
+                <path class="lit" d="M28.5 22.5h9" stroke-width="3" stroke-linecap="round" />
+                <path class="check" d="M28.5 9.5l3 3 6-6" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Choisir</span>
+            </button>
           </div>
           <div class="display-list" id="displayList" hidden></div>
           <div class="muted" id="displayHint" hidden></div>
-        </div>
+        </section>
 
-        <div class="row">
-          <div>
-            <div class="row__title">Lancer au demarrage</div>
-            <div class="muted">Demarre en arriere-plan avec la session</div>
+        <section class="card panel">
+          <div class="panel__head">
+            <h2 id="volumeTitle">Volume des videos</h2>
+            <div class="volume__pct" id="volumePct" aria-hidden="true"></div>
           </div>
-          <input type="checkbox" id="launchAtLogin" class="switch" />
-        </div>
+          <div
+            class="volume"
+            id="volume"
+            role="slider"
+            tabindex="0"
+            aria-labelledby="volumeTitle"
+            aria-valuemin="0"
+            aria-valuemax="100"
+          ></div>
+        </section>
 
-        <div class="row row--stack">
-          <div class="row__title">Volume des videos</div>
-          <input type="range" id="volume" min="0" max="100" step="5" />
-        </div>
-
-        <div class="actions">
-          <button id="previewButton">Apercu</button>
-          <button class="danger" id="unlinkButton">Delier cet appareil</button>
-        </div>
-
-        <button class="link" id="tutorialButton">Revoir le tutoriel</button>
-      </section>
+        <section class="actions">
+          <button type="button" class="btn btn--lime btn--big press" id="previewButton">
+            <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" /></svg>
+            <span id="previewLabel">Apercu</span>
+          </button>
+          <button type="button" class="btn btn--danger btn--big press" id="unlinkButton">Delier cet appareil</button>
+        </section>
+      </div>
 
       <!-- Version et mises a jour : visible lie ou non -->
-      <section class="card card--compact" id="updateCard" hidden>
-        <div class="row row--last">
-          <div>
-            <div class="row__title" id="appVersion"></div>
-            <div class="muted" id="updateText"></div>
+      <section class="card update" id="updateCard" hidden>
+        <div>
+          <div class="update__version" id="appVersion"></div>
+          <div class="update__state" id="updateState">
+            <svg class="update__ok" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="7" /><path d="M4 7.2l2 2 4-4.2" /></svg>
+            <span id="updateText"></span>
           </div>
-          <button id="updateButton"></button>
         </div>
+        <button type="button" class="btn press" id="updateButton"></button>
       </section>
 
       <p class="hint">

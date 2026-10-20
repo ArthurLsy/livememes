@@ -1,0 +1,66 @@
+/*
+ * Variables de design LiveMemes, partagees par les reglages et l'overlay.
+ * Charte complete : packages/desktop/DESIGN.md.
+ */
+
+@font-face {
+  font-family: 'Unbounded';
+  font-weight: 200 900;
+  font-display: block;
+  src: url('fonts/unbounded.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-weight: 300 900;
+  font-display: block;
+  src: url('fonts/figtree.woff2') format('woff2');
+}
+
+:root {
+  /* Fonds, du plus profond au plus releve */
+  --bg: #0d1226;
+  --surface: #161c3a;
+  --surface-2: #1f2650;
+  --raised: #252d5c;
+  --track: #2a3266;
+  --edge: #0a0f22;
+  --edge-deep: #080b1b;
+
+  /* Texte */
+  --text: #eef1ff;
+  --text-2: #c5cbf0;
+  --muted: #9aa3d4;
+
+  /* Couleurs de marque, chacune avec son bord "3D" */
+  --accent: #6c5cff;
+  --accent-edge: #3f33b8;
+  --accent-soft: #c9c2ff;
+  --lime: #c8ff3a;
+  --lime-edge: #86a80e;
+  --red: #ff4d4d;
+  --red-edge: #a32a3a;
+  --red-text: #ff7070;
+  --red-deep: #4a1a28;
+  --orange: #f5a524;
+
+  /* Ecrans eteints / allumes dans les vignettes */
+  --screen-lit: #7e88c9;
+  --screen-dim: #4a5390;
+
+  /* Rayons */
+  --r-card: 24px;
+  --r-btn: 18px;
+  --r-icon: 14px;
+  --r-small: 12px;
+  --r-pill: 999px;
+
+  /* Espacements */
+  --gap: 12px;
+  --pad-card: 16px 18px;
+
+  /* Typo */
+  --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}

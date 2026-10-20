@@ -25,6 +25,8 @@ export interface Settings {
    */
   displays: DisplayChoice;
   launchAtLogin: boolean;
+  /** Croix discrete en haut a droite de chaque meme pour le fermer (#18). */
+  closeButton: boolean;
   /** Appareil deja lie au moins une fois : le tutoriel saute alors la bienvenue. */
   onboarded: boolean;
 }
@@ -36,6 +38,7 @@ const DEFAULTS: Settings = {
   muted: false,
   displays: 'primary',
   launchAtLogin: false,
+  closeButton: true,
   onboarded: false,
 };
 

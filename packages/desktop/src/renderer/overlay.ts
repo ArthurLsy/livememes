@@ -1,10 +1,16 @@
 import type { MemeDrop, MemePosition } from '@livememes/shared';
+import { initialOf } from './avatar.ts';
+import { nudge } from './close.ts';
 import { DropQueue, playsOnce, type View } from './queue.ts';
+
+/** Drop tel que le main l'envoie : `closable` dit s'il faut afficher la croix. */
+type OverlayDrop = MemeDrop & { closable?: boolean };
 
 declare global {
   interface Window {
     overlay: {
-      onDrop(handler: (drop: MemeDrop) => void): void;
+      onDrop(handler: (drop: OverlayDrop) => void): void;
+      setInteractive(interactive: boolean): void;
       onClear(handler: (dropId: string | null) => void): void;
       onIdentify(handler: (payload: { number: number; durationMs: number }) => void): void;
     };
@@ -72,7 +78,55 @@ function buildMedia(drop: MemeDrop, onEnd: () => void): HTMLElement {
   return image;
 }
 
-function mount(drop: MemeDrop, end: () => void): View {
+/* -------------------------------------------------------------------------- */
+/* Croix de fermeture                                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * La fenetre laisse passer les clics (`setIgnoreMouseEvents(true, { forward })`)
+ * mais recoit les mouvements de souris : on ne la rend cliquable que pendant
+ * le survol de la croix, partout ailleurs le jeu garde la main.
+ */
+let hovered: HTMLButtonElement | null = null;
+
+function setHovered(button: HTMLButtonElement | null): void {
+  if (hovered === button) return;
+  hovered = button;
+  window.overlay.setInteractive(button !== null);
+}
+
+/** Recale la croix dans l'ecran quand le meme deborde (grand meme en coin). */
+function keepInside(button: HTMLButtonElement): void {
+  button.style.removeProperty('translate');
+  const offset = nudge(button.getBoundingClientRect(), window.innerWidth, window.innerHeight);
+  if (offset.x !== 0 || offset.y !== 0) button.style.translate = `${offset.x}px ${offset.y}px`;
+}
+
+const SVG = 'http://www.w3.org/2000/svg';
+
+function buildClose(onClose: () => void): HTMLButtonElement {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'drop__close';
+  button.setAttribute('aria-label', 'Fermer ce meme');
+
+  const icon = document.createElementNS(SVG, 'svg');
+  icon.setAttribute('viewBox', '0 0 24 24');
+  icon.setAttribute('aria-hidden', 'true');
+  const cross = document.createElementNS(SVG, 'path');
+  cross.setAttribute('d', 'M6 6l12 12M18 6L6 18');
+  icon.append(cross);
+  button.append(icon);
+
+  button.addEventListener('mouseenter', () => setHovered(button));
+  button.addEventListener('mouseleave', () => {
+    if (hovered === button) setHovered(null);
+  });
+  button.addEventListener('click', onClose);
+  return button;
+}
+
+function mount(drop: OverlayDrop, end: () => void): View {
   const anchor = anchorFor(drop.position);
   const element = document.createElement('div');
   element.className = 'drop';
@@ -80,7 +134,23 @@ function mount(drop: MemeDrop, end: () => void): View {
   element.style.setProperty('--y', `${anchor.y}%`);
   element.style.setProperty('--h', `${Math.round(drop.scale * 100)}vh`);
 
-  element.append(buildMedia(drop, end));
+  const frame = document.createElement('div');
+  frame.className = 'drop__frame';
+  const media = buildMedia(drop, end);
+  frame.append(media);
+  element.append(frame);
+
+  let close: HTMLButtonElement | null = null;
+  if (drop.closable) {
+    // Ne ferme que ce meme, sur cet ecran : la file passe au suivant.
+    close = buildClose(() => queue.remove(drop.id));
+    frame.append(close);
+    const button = close;
+    // Mesure une fois l'entree terminee (le scale fausserait la position) et
+    // quand le media connait sa taille.
+    element.addEventListener('animationend', () => keepInside(button), { once: true });
+    media.addEventListener(media instanceof HTMLVideoElement ? 'loadedmetadata' : 'load', () => keepInside(button));
+  }
 
   if (drop.caption) {
     const caption = document.createElement('div');
@@ -91,13 +161,18 @@ function mount(drop: MemeDrop, end: () => void): View {
 
   const author = document.createElement('div');
   author.className = 'drop__author';
+  // L'initiale reste dessous : visible tant que l'avatar charge, ou s'il echoue.
+  const avatar = document.createElement('span');
+  avatar.className = 'drop__avatar';
+  avatar.textContent = initialOf(drop.author.username);
   if (drop.author.avatarUrl) {
-    const avatar = document.createElement('img');
-    avatar.className = 'drop__avatar';
-    avatar.src = drop.author.avatarUrl;
-    avatar.alt = '';
-    author.append(avatar);
+    const image = document.createElement('img');
+    image.src = drop.author.avatarUrl;
+    image.alt = '';
+    image.addEventListener('error', () => image.remove());
+    avatar.append(image);
   }
+  author.append(avatar);
   const name = document.createElement('span');
   name.textContent = drop.author.username;
   author.append(name);
@@ -106,7 +181,12 @@ function mount(drop: MemeDrop, end: () => void): View {
   stage.append(element);
 
   return {
-    leave: () => element.classList.add('leaving'),
+    leave: () => {
+      element.classList.add('leaving');
+      // Le son s'arrete tout de suite, sans attendre la fin de l'animation.
+      if (media instanceof HTMLVideoElement) media.pause();
+      if (close && hovered === close) setHovered(null);
+    },
     destroy: () => element.remove(),
   };
 }
