@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { BrowserWindow, screen, type Display } from 'electron';
+import { BrowserWindow, ipcMain, screen, type Display } from 'electron';
 import type { MemeDrop } from '@livememes/shared';
 import * as store from './store.ts';
 
@@ -9,6 +9,18 @@ const identifyOnly = new Set<number>();
 
 const RENDERER = path.join(__dirname, '../renderer');
 const PRELOAD = path.join(__dirname, '../preload/index.cjs');
+
+/**
+ * La croix de fermeture repose sur `forward: true`, qui transmet les mouvements
+ * de souris au renderer d'une fenetre traversante. Electron ne le gere pas sous
+ * Linux : la croix n'y serait jamais survolable, on ne l'affiche pas.
+ */
+export const CLOSE_SUPPORTED = process.platform !== 'linux';
+
+/** Etat "traversant" par defaut : les clics passent, les mouvements remontent. */
+function passThrough(window: BrowserWindow): void {
+  window.setIgnoreMouseEvents(true, { forward: true });
+}
 
 /**
  * Fenetre plein ecran, transparente et traversante par la souris.
@@ -34,7 +46,9 @@ function createForDisplay(display: Display): BrowserWindow {
     hasShadow: false,
     enableLargerThanScreen: true,
     fullscreenable: false,
-    acceptFirstMouse: false,
+    // macOS : sans ca, le premier clic sur la croix ne ferait qu'activer la
+    // fenetre. Sans effet ailleurs, et la fenetre reste traversante hors croix.
+    acceptFirstMouse: true,
     backgroundColor: '#00000000',
     show: false,
     webPreferences: {
@@ -46,7 +60,7 @@ function createForDisplay(display: Display): BrowserWindow {
   });
 
   // La souris traverse l'overlay : on ne veut jamais bloquer un clic dans le jeu.
-  window.setIgnoreMouseEvents(true, { forward: true });
+  passThrough(window);
   window.setAlwaysOnTop(true, 'screen-saver', 1);
   window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   window.setContentProtection(false);
@@ -111,6 +125,15 @@ export function sync(): void {
 }
 
 export function init(): void {
+  // Le renderer survole ou quitte une croix de fermeture. On ne l'accepte que
+  // d'une fenetre d'overlay : la fenetre de reglages partage le preload.
+  ipcMain.on('overlay:interactive', (event, interactive: unknown) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window || ![...windows.values()].includes(window)) return;
+    if (interactive === true && CLOSE_SUPPORTED) window.setIgnoreMouseEvents(false);
+    else passThrough(window);
+  });
+
   sync();
   screen.on('display-added', sync);
   screen.on('display-removed', sync);
@@ -133,7 +156,11 @@ export function show(drop: MemeDrop): void {
   if (settings.muted) return;
 
   // Le volume local plafonne celui demande par l'expediteur.
-  const payload = { ...drop, volume: drop.volume * settings.volume };
+  const payload = {
+    ...drop,
+    volume: drop.volume * settings.volume,
+    closable: settings.closeButton && CLOSE_SUPPORTED,
+  };
 
   each((window) => {
     // Un jeu passe en plein ecran peut avoir repris le dessus entre deux drops.
@@ -143,7 +170,11 @@ export function show(drop: MemeDrop): void {
 }
 
 export function clear(dropId: string | null): void {
-  each((window) => window.webContents.send('overlay:clear', dropId));
+  each((window) => {
+    window.webContents.send('overlay:clear', dropId);
+    // Un meme retire sous la souris ne doit pas laisser la fenetre cliquable.
+    if (dropId === null) passThrough(window);
+  });
 }
 
 /** Affiche un meme de test local, sans passer par le serveur. */

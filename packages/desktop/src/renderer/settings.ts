@@ -1,4 +1,13 @@
 import { nextStep, normalizeCode, STEPS, type Step } from './onboarding.ts';
+import { initialOf } from './avatar.ts';
+import {
+  levelFromKey,
+  levelFromPointer,
+  statusView,
+  VOLUME_BAR_HEIGHTS,
+  VOLUME_STEPS,
+  volumeLevel,
+} from './settings-view.ts';
 
 interface AppState {
   serverUrl: string;
@@ -9,6 +18,9 @@ interface AppState {
   displays: 'primary' | 'all' | number[];
   displayList: { id: number; label: string; primary: boolean; active: boolean }[];
   launchAtLogin: boolean;
+  closeButton: boolean;
+  /** Faux sous Linux : la fenetre traversante n'y remonte pas la souris. */
+  closeSupported: boolean;
   onboarded: boolean;
   status: 'offline' | 'connecting' | 'online' | 'unauthorized';
   detail: string | null;
@@ -49,13 +61,7 @@ const statusText = $<HTMLElement>('statusText');
 const pairError = $<HTMLElement>('pairError');
 const codeInput = $<HTMLInputElement>('code');
 const pairButton = $<HTMLButtonElement>('pairButton');
-
-const STATUS: Record<AppState['status'], { label: string; cls: string }> = {
-  offline: { label: 'Deconnecte', cls: 'error' },
-  connecting: { label: 'Connexion…', cls: 'connecting' },
-  online: { label: 'Connecte', cls: 'online' },
-  unauthorized: { label: 'Non lie', cls: 'error' },
-};
+const tutorialButton = $<HTMLButtonElement>('tutorialButton');
 
 /* -------------------------------------------------------------------------- */
 /* Tutoriel                                                                   */
@@ -99,8 +105,7 @@ function renderTutorial(state: AppState): void {
 
   if (state.user) {
     $<HTMLElement>('doneUsername').textContent = state.user.username;
-    const avatar = $<HTMLImageElement>('doneAvatar');
-    if (state.user.avatarUrl) avatar.src = state.user.avatarUrl;
+    showAvatar('doneAvatar', 'doneInitial', state.user);
   }
 
   // Juste apres l'appairage, pas de retour vers les etapes qui y menent.
@@ -129,7 +134,7 @@ $<HTMLButtonElement>('testButton').addEventListener('click', () => {
   void window.livememes.preview();
 });
 
-$<HTMLButtonElement>('tutorialButton').addEventListener('click', () => {
+tutorialButton.addEventListener('click', () => {
   reopened = true;
   showStep('welcome');
 });
@@ -141,6 +146,8 @@ function applyUpdater({ mode, currentVersion, update }: AppState['updater']): vo
   const card = $<HTMLElement>('updateCard');
   const text = $<HTMLElement>('updateText');
   const button = $<HTMLButtonElement>('updateButton');
+  const line = $<HTMLElement>('updateState');
+  line.className = `update__state${update.state === 'upToDate' ? ' is-ok' : update.state === 'error' ? ' is-error' : ''}`;
 
   card.hidden = mode === 'disabled';
   if (mode === 'disabled') return;
@@ -181,6 +188,7 @@ function applyUpdater({ mode, currentVersion, update }: AppState['updater']): vo
 
 /** Derniere liste choisie, conservee si on repasse par "principal" ou "tous". */
 let customDisplays: number[] = [];
+const screenChoices = [...document.querySelectorAll<HTMLButtonElement>('.screen')];
 let lastDisplayList: AppState['displayList'] = [];
 
 function applyDisplays({ displays, displayList }: AppState): void {
@@ -188,8 +196,8 @@ function applyDisplays({ displays, displayList }: AppState): void {
   if (Array.isArray(displays)) customDisplays = displays;
   lastDisplayList = displayList;
 
-  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="displayMode"]')) {
-    radio.checked = radio.value === mode;
+  for (const choice of screenChoices) {
+    choice.setAttribute('aria-checked', String(choice.dataset.mode === mode));
   }
 
   const list = $<HTMLElement>('displayList');
@@ -220,12 +228,17 @@ function apply(state: AppState): void {
   if (!state.linked) reopened = false;
   applyUpdater(state.updater);
 
-  const status = state.linked ? STATUS[state.status] : STATUS.unauthorized;
-  dot.className = `dot ${status.cls}`;
-  statusText.textContent = state.linked && state.detail && state.status !== 'online' ? state.detail : status.label;
+  const status = statusView(state);
+  // Prefixe is- : .error est deja pris par le message d'erreur d'appairage.
+  dot.className = `dot is-${status.cls}`;
+  statusText.textContent = status.label;
+  const detail = $<HTMLElement>('statusDetail');
+  detail.hidden = status.detail === null;
+  detail.textContent = status.detail ?? '';
 
   tutorial.hidden = step === null;
   linkedCard.hidden = step !== null || !state.linked;
+  tutorialButton.hidden = linkedCard.hidden;
   renderTutorial(state);
   wasLinked = state.linked;
 
@@ -233,15 +246,95 @@ function apply(state: AppState): void {
 
   $<HTMLElement>('username').textContent = state.user?.username ?? '';
   $<HTMLElement>('serverLabel').textContent = state.serverUrl;
+  if (state.user) showAvatar('avatar', 'initial', state.user);
 
-  const avatar = $<HTMLImageElement>('avatar');
-  if (state.user?.avatarUrl) avatar.src = state.user.avatarUrl;
-
-  $<HTMLInputElement>('muted').checked = state.muted;
+  $<HTMLElement>('hero').classList.toggle('is-muted', state.muted);
+  $<HTMLButtonElement>('muted').setAttribute('aria-checked', String(state.muted));
+  $<HTMLButtonElement>('launchAtLogin').setAttribute('aria-checked', String(state.launchAtLogin));
+  const closeButton = $<HTMLButtonElement>('closeButton');
+  closeButton.hidden = !state.closeSupported;
+  closeButton.setAttribute('aria-checked', String(state.closeButton));
   applyDisplays(state);
-  $<HTMLInputElement>('launchAtLogin').checked = state.launchAtLogin;
-  $<HTMLInputElement>('volume').value = String(Math.round(state.volume * 100));
+  if (!draggingVolume) renderVolume(volumeLevel(state.volume));
 }
+
+/** Avatar Discord par-dessus l'initiale, qui reste visible s'il ne charge pas. */
+function showAvatar(imgId: string, initialId: string, user: NonNullable<AppState['user']>): void {
+  $<HTMLElement>(initialId).textContent = initialOf(user.username);
+  const img = $<HTMLImageElement>(imgId);
+  if (!user.avatarUrl) {
+    img.hidden = true;
+    return;
+  }
+  if (img.getAttribute('src') !== user.avatarUrl) {
+    img.hidden = true;
+    img.onload = () => (img.hidden = false);
+    img.onerror = () => (img.hidden = true);
+    img.src = user.avatarUrl;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Volume : egaliseur cliquable, curseur ARIA au clavier                      */
+/* -------------------------------------------------------------------------- */
+
+const volume = $<HTMLElement>('volume');
+const volumeBars = VOLUME_BAR_HEIGHTS.map((height) => {
+  const bar = document.createElement('span');
+  bar.style.height = `${height}px`;
+  return bar;
+});
+volume.replaceChildren(...volumeBars);
+
+let volumeShown = 0;
+let draggingVolume = false;
+
+function renderVolume(level: number): void {
+  volumeShown = level;
+  volumeBars.forEach((bar, i) => bar.classList.toggle('lit', i < level));
+  const pct = `${level * (100 / VOLUME_STEPS)}%`;
+  $<HTMLElement>('volumePct').textContent = pct;
+  volume.setAttribute('aria-valuenow', String(level * (100 / VOLUME_STEPS)));
+  volume.setAttribute('aria-valuetext', pct);
+}
+
+function commitVolume(level: number): void {
+  renderVolume(level);
+  void window.livememes.setSettings({ volume: level / VOLUME_STEPS });
+}
+
+function pointerLevel(event: PointerEvent): number {
+  const box = volume.getBoundingClientRect();
+  return levelFromPointer(event.clientX - box.left, box.width);
+}
+
+volume.addEventListener('pointerdown', (event) => {
+  draggingVolume = true;
+  volume.setPointerCapture(event.pointerId);
+  renderVolume(pointerLevel(event));
+});
+
+volume.addEventListener('pointermove', (event) => {
+  if (draggingVolume) renderVolume(pointerLevel(event));
+});
+
+volume.addEventListener('pointerup', (event) => {
+  if (!draggingVolume) return;
+  draggingVolume = false;
+  commitVolume(pointerLevel(event));
+});
+
+volume.addEventListener('pointercancel', () => {
+  draggingVolume = false;
+  if (lastState) renderVolume(volumeLevel(lastState.volume));
+});
+
+volume.addEventListener('keydown', (event) => {
+  const level = levelFromKey(event.key, volumeShown);
+  if (level === null) return;
+  event.preventDefault();
+  if (level !== volumeShown) commitVolume(level);
+});
 
 /* -------------------------------------------------------------------------- */
 
@@ -278,18 +371,19 @@ async function submitPair(): Promise<void> {
   codeInput.value = '';
 }
 
-$<HTMLInputElement>('muted').addEventListener('change', (event) => {
-  void window.livememes.setSettings({ muted: (event.target as HTMLInputElement).checked });
+$<HTMLButtonElement>('muted').addEventListener('click', () => {
+  void window.livememes.setSettings({ muted: !lastState?.muted });
 });
 
-for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="displayMode"]')) {
-  radio.addEventListener('change', () => {
-    if (!radio.checked) return;
+for (const choice of screenChoices) {
+  choice.addEventListener('click', () => {
+    if (choice.getAttribute('aria-checked') === 'true') return;
+    const mode = choice.dataset.mode;
     void window.livememes.setSettings({
       // Premiere selection : on part des ecrans utilises en ce moment.
       displays:
-        radio.value !== 'custom'
-          ? radio.value
+        mode !== 'custom'
+          ? mode
           : customDisplays.length > 0
             ? customDisplays
             : lastDisplayList.filter((display) => display.active).map((display) => display.id),
@@ -308,18 +402,23 @@ $<HTMLButtonElement>('identifyButton').addEventListener('click', () => {
   void window.livememes.identifyDisplays();
 });
 
-$<HTMLInputElement>('launchAtLogin').addEventListener('change', (event) => {
-  void window.livememes.setSettings({ launchAtLogin: (event.target as HTMLInputElement).checked });
+$<HTMLButtonElement>('launchAtLogin').addEventListener('click', () => {
+  void window.livememes.setSettings({ launchAtLogin: !lastState?.launchAtLogin });
 });
 
-$<HTMLInputElement>('volume').addEventListener('change', (event) => {
-  void window.livememes.setSettings({
-    volume: Number((event.target as HTMLInputElement).value) / 100,
-  });
+$<HTMLButtonElement>('closeButton').addEventListener('click', () => {
+  void window.livememes.setSettings({ closeButton: !lastState?.closeButton });
 });
+
+let previewTimer: ReturnType<typeof setTimeout> | undefined;
 
 $<HTMLButtonElement>('previewButton').addEventListener('click', () => {
   void window.livememes.preview();
+  // Retour visuel : le meme part sur l'overlay, pas dans cette fenetre.
+  const label = $<HTMLElement>('previewLabel');
+  label.textContent = 'Envoye !';
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => (label.textContent = 'Apercu'), 1600);
 });
 
 $<HTMLButtonElement>('updateButton').addEventListener('click', () => {

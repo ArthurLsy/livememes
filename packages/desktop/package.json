@@ -11,11 +11,13 @@
     "dev": "node build.mjs --watch --start",
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
+    "art": "node scripts/installer-art.mjs",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@livememes/shared": "*",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^24.10.1",
     "@types/ws": "^8.18.1",
     "electron": "44.1.0",
@@ -36,11 +38,22 @@
     "npmRebuild": false,
     "publish": { "provider": "github", "owner": "ArthurLsy", "repo": "livememes" },
     "mac": { "category": "public.app-category.entertainment", "target": ["dmg", "zip"] },
+    "dmg": {
+      "background": "build/background.png",
+      "window": { "width": 540, "height": 380 },
+      "contents": [
+        { "x": 130, "y": 180, "type": "file" },
+        { "x": 410, "y": 180, "type": "link", "path": "/Applications" }
+      ]
+    },
     "win": { "target": ["nsis", "zip"] },
     "nsis": {
       "oneClick": false,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/installerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp"
     },
     "linux": {
       "target": ["AppImage"],

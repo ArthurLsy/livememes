@@ -105,6 +105,9 @@ gateway WS (`/ws`) et lance le client Discord.
   `screen-saver` reapplique a chaque drop (un jeu plein ecran peut avoir repris le dessus).
 - Renderers sans acces Node : tout passe par le `contextBridge` du preload, et
   toute navigation est bloquee dans `web-contents-created`.
+- Design : variables dans `renderer/tokens.css` (importe par settings et overlay),
+  charte dans `packages/desktop/DESIGN.md`. Polices embarquees dans
+  `renderer/fonts/` (CSP sans police distante).
 
 **Protocole** (`packages/shared/src/index.ts`) — source unique de verite pour les
 messages WS et le payload d'appairage. Toute evolution incompatible doit bouger

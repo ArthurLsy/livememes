@@ -1,6 +1,16 @@
 import path from 'node:path';
 import os from 'node:os';
-import { app, ipcMain, Menu, nativeImage, screen, shell, Tray, type MenuItemConstructorOptions } from 'electron';
+import {
+  app,
+  globalShortcut,
+  ipcMain,
+  Menu,
+  nativeImage,
+  screen,
+  shell,
+  Tray,
+  type MenuItemConstructorOptions,
+} from 'electron';
 import type { PairResponse } from '@livememes/shared';
 import { pairErrorMessage } from '../renderer/onboarding.ts';
 import * as store from './store.ts';
@@ -25,6 +35,19 @@ let lastStatus: ConnectionStatus = 'offline';
 let lastDetail: string | null = null;
 let quitting = false;
 
+/**
+ * Raccourci global qui ferme tous les memes affiches sur cette machine, pour
+ * quand on ne peut pas viser la croix (et sous Linux, ou elle n'existe pas).
+ * Trois modificateurs : Ctrl+Shift+X est deja pris par VS Code et d'autres.
+ */
+const CLEAR_SHORTCUT = 'CommandOrControl+Alt+Shift+X';
+let clearShortcutActive = false;
+
+/** Efface les memes de cet appareil seulement, file d'attente comprise. */
+function clearLocal(): void {
+  overlay.clear(null);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Etat partage avec la fenetre de reglages                                   */
 /* -------------------------------------------------------------------------- */
@@ -40,6 +63,8 @@ function appState() {
     displays: settings.displays,
     displayList: overlay.listDisplays(),
     launchAtLogin: settings.launchAtLogin,
+    closeButton: settings.closeButton,
+    closeSupported: overlay.CLOSE_SUPPORTED,
     onboarded: settings.onboarded,
     status: lastStatus,
     detail: lastDetail,
@@ -110,6 +135,13 @@ function renderTray(): void {
           overlay.sync();
           broadcastState();
         },
+      },
+      {
+        label: 'Fermer les memes affiches',
+        accelerator: clearShortcutActive ? CLEAR_SHORTCUT : undefined,
+        // Le raccourci est global : le menu ne fait que l'afficher.
+        registerAccelerator: false,
+        click: clearLocal,
       },
       { type: 'separator' },
       { label: 'Apercu', click: () => overlay.preview() },
@@ -211,6 +243,11 @@ app.whenReady().then(() => {
   screen.on('display-removed', () => broadcastState());
   screen.on('display-metrics-changed', () => broadcastState());
 
+  // Echoue sans bruit si une autre app a deja pris la combinaison : le menu
+  // de la barre de menus reste alors le seul moyen.
+  clearShortcutActive = globalShortcut.register(CLEAR_SHORTCUT, clearLocal);
+  if (!clearShortcutActive) console.warn(`[overlay] raccourci ${CLEAR_SHORTCUT} indisponible`);
+
   renderTray();
 
   if (store.get().token) {
@@ -235,6 +272,7 @@ app.whenReady().then(() => {
     const previous = store.get();
     // Valeur ecrite telle quelle dans settings.json puis lue par overlay.sync().
     if (patch.displays !== undefined && !isDisplayChoice(patch.displays)) delete patch.displays;
+    if (patch.closeButton !== undefined && typeof patch.closeButton !== 'boolean') delete patch.closeButton;
     store.update(patch);
 
     if (patch.muted !== undefined && patch.muted !== previous.muted) {
@@ -270,6 +308,8 @@ app.on('second-instance', () => settingsWindow.open());
 // L'app vit dans la barre de menus : la seule presence de ce listener empeche
 // Electron de quitter quand la fenetre de reglages se ferme.
 app.on('window-all-closed', () => {});
+
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('before-quit', () => {
   quitting = true;

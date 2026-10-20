@@ -52,6 +52,8 @@ async function copyStatic() {
       await fs.copyFile(path.join(dir, name), path.join(here, 'dist/renderer', name));
     }
   }
+  // Polices embarquees : la CSP interdit toute police distante.
+  await fs.cp(path.join(dir, 'fonts'), path.join(here, 'dist/renderer/fonts'), { recursive: true });
 }
 
 await copyStatic();

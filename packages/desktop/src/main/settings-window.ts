@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, screen } from 'electron';
 
 let window: BrowserWindow | null = null;
 
@@ -11,8 +11,12 @@ export function open(): BrowserWindow {
   }
 
   window = new BrowserWindow({
+    // Taille du contenu, barre de titre exclue : celle de la maquette, plus la
+    // croix de fermeture et la liste des ecrans en mode "Choisir". Plafonnee a
+    // l'ecran : sur un portable, la page defile.
     width: 520,
-    height: 740,
+    height: Math.min(924, screen.getPrimaryDisplay().workAreaSize.height - 40),
+    useContentSize: true,
     resizable: false,
     title: 'LiveMemes',
     backgroundColor: '#0d1226',

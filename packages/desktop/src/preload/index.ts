@@ -1,11 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { MemeDrop } from '@livememes/shared';
 
-/** API exposee a l'overlay (lecture seule : il ne fait qu'afficher). */
+/**
+ * API exposee a l'overlay. Il ne fait qu'afficher, a une exception pres : la
+ * croix de fermeture demande a capter la souris pendant qu'on la survole.
+ */
 contextBridge.exposeInMainWorld('overlay', {
-  onDrop: (handler: (drop: MemeDrop) => void) => {
-    ipcRenderer.on('overlay:drop', (_event, drop: MemeDrop) => handler(drop));
+  onDrop: (handler: (drop: MemeDrop & { closable?: boolean }) => void) => {
+    ipcRenderer.on('overlay:drop', (_event, drop: MemeDrop & { closable?: boolean }) => handler(drop));
   },
+  setInteractive: (interactive: boolean) => ipcRenderer.send('overlay:interactive', interactive === true),
   onClear: (handler: (dropId: string | null) => void) => {
     ipcRenderer.on('overlay:clear', (_event, dropId: string | null) => handler(dropId));
   },
