@@ -33,7 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Creer la prerelease si absente
+      # Tag avec suffixe (v0.2.0-beta.1) : prerelease publiee tout de suite,
+      # seules les installations beta la voient. Tag stable (v0.1.0) : brouillon,
+      # a publier a la main une fois les binaires testes. Tant qu'elle est en
+      # brouillon, ni l'auto-update ni releases/latest ne la voient.
+      - name: Creer la release si absente
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -43,8 +47,11 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG deja presente, les binaires seront remplaces"
           else
-            gh release create "$TAG" \
-              --prerelease \
+            case "$TAG" in
+              *-*) KIND=--prerelease ;;
+              *) KIND=--draft ;;
+            esac
+            gh release create "$TAG" "$KIND" \
               --title "LiveMemes $TAG" \
               --notes-file .github/RELEASE_NOTES.md
           fi
