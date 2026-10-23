@@ -10,7 +10,7 @@ declare global {
   interface Window {
     overlay: {
       onDrop(handler: (drop: OverlayDrop) => void): void;
-      setInteractive(interactive: boolean): void;
+      setCloseZones(zones: { left: number; top: number; right: number; bottom: number }[]): void;
       onClear(handler: (dropId: string | null) => void): void;
       onIdentify(handler: (payload: { number: number; durationMs: number }) => void): void;
     };
@@ -83,23 +83,36 @@ function buildMedia(drop: MemeDrop, onEnd: () => void): HTMLElement {
 /* -------------------------------------------------------------------------- */
 
 /**
- * La fenetre laisse passer les clics (`setIgnoreMouseEvents(true, { forward })`)
- * mais recoit les mouvements de souris : on ne la rend cliquable que pendant
- * le survol de la croix, partout ailleurs le jeu garde la main.
+ * La fenetre laisse passer tous les clics. Le main releve le curseur et ne la
+ * rend cliquable que lorsqu'il survole l'une des zones declarees ici : chaque
+ * changement (entree, recalage, sortie d'un meme, redimensionnement) les
+ * renvoie.
  */
-let hovered: HTMLButtonElement | null = null;
 
-function setHovered(button: HTMLButtonElement | null): void {
-  if (hovered === button) return;
-  hovered = button;
-  window.overlay.setInteractive(button !== null);
+/** Marge autour de la croix, la meme que son `::before` dans overlay.css. */
+const HIT_MARGIN = 10;
+
+function reportZones(): void {
+  const zones = [...stage.querySelectorAll<HTMLButtonElement>('.drop:not(.leaving) .drop__close')].map((button) => {
+    const rect = button.getBoundingClientRect();
+    return {
+      left: rect.left - HIT_MARGIN,
+      top: rect.top - HIT_MARGIN,
+      right: rect.right + HIT_MARGIN,
+      bottom: rect.bottom + HIT_MARGIN,
+    };
+  });
+  window.overlay.setCloseZones(zones);
 }
+
+window.addEventListener('resize', reportZones);
 
 /** Recale la croix dans l'ecran quand le meme deborde (grand meme en coin). */
 function keepInside(button: HTMLButtonElement): void {
   button.style.removeProperty('translate');
   const offset = nudge(button.getBoundingClientRect(), window.innerWidth, window.innerHeight);
   if (offset.x !== 0 || offset.y !== 0) button.style.translate = `${offset.x}px ${offset.y}px`;
+  reportZones();
 }
 
 const SVG = 'http://www.w3.org/2000/svg';
@@ -118,10 +131,6 @@ function buildClose(onClose: () => void): HTMLButtonElement {
   icon.append(cross);
   button.append(icon);
 
-  button.addEventListener('mouseenter', () => setHovered(button));
-  button.addEventListener('mouseleave', () => {
-    if (hovered === button) setHovered(null);
-  });
   button.addEventListener('click', onClose);
   return button;
 }
@@ -179,13 +188,15 @@ function mount(drop: OverlayDrop, end: () => void): View {
   element.append(author);
 
   stage.append(element);
+  // Zone approximative pendant l'animation d'entree, recalee a `animationend`.
+  if (close) reportZones();
 
   return {
     leave: () => {
       element.classList.add('leaving');
       // Le son s'arrete tout de suite, sans attendre la fin de l'animation.
       if (media instanceof HTMLVideoElement) media.pause();
-      if (close && hovered === close) setHovered(null);
+      if (close) reportZones();
     },
     destroy: () => element.remove(),
   };

@@ -183,8 +183,9 @@ ecran seulement : les autres membres du vocal le gardent, et le suivant de la
 file prend sa place. Hors de la croix, la souris traverse toujours l'overlay.
 `Ctrl+Alt+Shift+X` (`Cmd+Alt+Shift+X` sur macOS) ou "Fermer les memes affiches"
 dans la barre de menus ferment tout d'un coup. La croix se desactive dans les
-reglages ; elle n'existe pas sous Linux, ou Electron ne sait pas rendre une
-fenetre traversante sensible au survol (le raccourci et le menu marchent).
+reglages ; elle n'existe pas sous Linux, ou Electron ne connait pas toujours la
+position du curseur hors de ses fenetres (Wayland). Le raccourci et le menu y
+marchent.
 
 Plusieurs memes envoyes d'affilee s'affichent l'un apres l'autre, dans l'ordre
 d'arrivee : chaque ecran a sa file de 8 memes en attente. File pleine, les
