@@ -44,6 +44,9 @@
   --red-deep: #4a1a28;
   --orange: #f5a524;
 
+  /* Voile sur la partie coupee de la timeline de l'editeur */
+  --scrim: rgba(13, 18, 38, 0.72);
+
   /* Ecrans eteints / allumes dans les vignettes */
   --screen-lit: #7e88c9;
   --screen-dim: #4a5390;

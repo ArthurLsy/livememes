@@ -38,6 +38,7 @@ d'icones en noir).
 | `--red` / `--red-edge` | `#FF4D4D` / `#A32A3A` | Rouge live : sourdine, erreur, pastille du logo |
 | `--red-text` / `--red-deep` | `#FF7070` / `#4A1A28` | Texte rouge sur fond sombre, tranche du bouton danger |
 | `--orange` | `#F5A524` | Connexion en cours |
+| `--scrim` | `rgba(13, 18, 38, 0.72)` | Voile sur la partie coupee de la timeline |
 
 Sur fond clair (DMG) : texte `#0D1226`, accent texte `#5B49F0`, cercles `#E0E4FF`.
 
@@ -107,6 +108,27 @@ converti en traces.
 - L'overlay ne capte la souris que sur la croix : `pointer-events: none`
   partout ailleurs, et la fenetre ne quitte `setIgnoreMouseEvents(true)` que
   pendant que le curseur, releve par le main, est sur la croix.
+
+## Editeur
+
+- Fenetre redimensionnable (900x640 minimum). Grille : scene et timeline a
+  gauche, panneau Texte/Envoi a droite sur toute la hauteur, pied d'actions en
+  bas. `editor.css` reprend les boutons et cartes des reglages.
+- **Scene** : fond `--edge-deep`. Le media garde ses proportions, avec le meme
+  lisere nuit et la meme tranche violette que sur l'overlay. Le texte est un
+  canvas par-dessus, cadre en pointilles au survol (on le glisse).
+- **Choix** `.seg` : pastilles `role="radio"`, violettes quand selectionnees
+  (polices, tailles, positions). Couleurs du texte en pastilles rondes, cerclees
+  de citron quand choisies.
+- **Timeline** : piste video avec miniatures et cadre citron de la partie
+  gardee, poignees citron, voile `--scrim` sur le reste. Piste son violette
+  (hachuree quand coupee), piste texte `--accent-soft` avec texte nuit. Tete de
+  lecture rouge.
+- **Pied** : statut (citron = reussi, `--red-text` = erreur), barre
+  d'avancement citron, "Enregistrer" gris et "Envoyer" citron.
+- Les couleurs proposees pour le texte du meme (`TEXT_COLORS` dans
+  `editor-model.ts`) sont du contenu, pas de la charte : elles restent hors de
+  `tokens.css`.
 
 ## Mouvement et accessibilite
 

@@ -125,3 +125,32 @@ export interface PairResponse {
 export const PAIRING_CODE_LENGTH = 8;
 /** Alphabet sans caracteres ambigus (pas de 0/O, 1/I/L). */
 export const PAIRING_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+/* -------------------------------------------------------------------------- */
+/* HTTP : envoi direct depuis l'editeur du client desktop                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `POST /api/drops` : le corps est le fichier brut, son type dans `Content-Type`,
+ * le token de l'appareil dans `Authorization: Bearer`. Les options d'affichage
+ * passent en query string, avec les memes valeurs que `/meme`.
+ */
+export interface DropUploadQuery {
+  size?: MemeSize;
+  position?: MemePosition;
+  /** 0-100, comme l'option `volume` de `/meme`. */
+  volume?: number;
+  /** Secondes, comme l'option `duree` de `/meme`. */
+  duration?: number;
+}
+
+/** Reponse d'un envoi reussi : de quoi afficher le bilan dans l'editeur. */
+export interface DropUploadResponse {
+  channelName: string;
+  /** Membres du salon vocal ayant le droit de recevoir le meme. */
+  audience: number;
+  reached: number;
+  offline: number;
+  muted: number;
+  screens: number;
+}

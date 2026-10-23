@@ -12,10 +12,10 @@ export function open(): BrowserWindow {
 
   window = new BrowserWindow({
     // Taille du contenu, barre de titre exclue : celle de la maquette, plus la
-    // croix de fermeture et la liste des ecrans en mode "Choisir". Plafonnee a
-    // l'ecran : sur un portable, la page defile.
+    // croix de fermeture, le bouton de l'editeur et la liste des ecrans en mode
+    // "Choisir". Plafonnee a l'ecran : sur un portable, la page defile.
     width: 520,
-    height: Math.min(924, screen.getPrimaryDisplay().workAreaSize.height - 40),
+    height: Math.min(988, screen.getPrimaryDisplay().workAreaSize.height - 40),
     useContentSize: true,
     resizable: false,
     title: 'LiveMemes',

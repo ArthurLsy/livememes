@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src file: data: blob:; media-src file: blob:; font-src file:; style-src 'unsafe-inline' file:; script-src 'self' file:;"
+    />
+    <title>LiveMemes - Editeur</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <img class="logo" src="logo.svg" alt="LiveMemes" />
+      <span class="bar__title">Editeur</span>
+      <span class="bar__file" id="fileName"></span>
+      <button type="button" class="btn btn--small press" id="openButton" hidden>Changer de fichier</button>
+    </header>
+
+    <main class="workspace">
+      <section class="stage" id="stage">
+        <div class="drop-zone" id="dropZone">
+          <svg width="56" height="56" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M10 9.5v5l4.5-2.5z" /></svg>
+          <h1>Glisse une video ou une photo ici</h1>
+          <p class="muted">mp4, mov, webm, GIF, png, jpg ou webp. Un clip fait 30 secondes au plus.</p>
+          <button type="button" class="btn btn--lime btn--big press" id="pickButton">Choisir un fichier</button>
+        </div>
+
+        <div class="frame" id="frame" hidden>
+          <video id="video" playsinline preload="auto"></video>
+          <img id="image" alt="" hidden />
+          <canvas id="textCanvas" aria-label="Texte du meme, glisse-le pour le placer"></canvas>
+        </div>
+      </section>
+
+      <aside class="side" id="side" hidden>
+        <section class="card panel">
+          <div class="panel__head">
+            <h2>Texte</h2>
+            <button type="button" class="btn btn--small press" id="clearText">Effacer</button>
+          </div>
+          <textarea id="textInput" rows="3" maxlength="200" placeholder="Ecris ton texte, puis glisse-le sur l'image"></textarea>
+
+          <div class="field field--stack">
+            <span class="label" id="fontLabel">Police</span>
+            <div class="segmented" role="radiogroup" aria-labelledby="fontLabel" id="fontGroup"></div>
+          </div>
+
+          <div class="field">
+            <label class="label" for="textSize">Taille</label>
+            <input type="range" id="textSize" min="3" max="25" step="0.5" />
+          </div>
+
+          <div class="field">
+            <span class="label" id="colorLabel">Couleur</span>
+            <div class="swatches" role="radiogroup" aria-labelledby="colorLabel" id="colorGroup"></div>
+          </div>
+
+          <button type="button" role="switch" aria-checked="true" class="switch press" id="outlineSwitch">
+            <span>Contour</span>
+            <span class="switch__track"><span class="switch__knob"></span></span>
+          </button>
+        </section>
+
+        <section class="card panel">
+          <h2>Envoi</h2>
+          <div class="field field--stack">
+            <span class="label" id="sizeLabel">Taille a l'ecran</span>
+            <div class="segmented segmented--4" role="radiogroup" aria-labelledby="sizeLabel" id="sizeGroup"></div>
+          </div>
+          <div class="field field--stack">
+            <span class="label" id="positionLabel">Position</span>
+            <div class="segmented segmented--3" role="radiogroup" aria-labelledby="positionLabel" id="positionGroup"></div>
+          </div>
+          <div class="field" id="volumeField">
+            <label class="label" for="volume">Volume</label>
+            <input type="range" id="volume" min="0" max="100" step="5" />
+            <span class="value" id="volumeValue"></span>
+          </div>
+          <div class="field" id="durationField">
+            <label class="label" for="duration">Duree</label>
+            <input type="range" id="duration" min="1" max="20" step="1" />
+            <span class="value" id="durationValue"></span>
+          </div>
+        </section>
+      </aside>
+    </main>
+
+    <section class="timeline card" id="timeline" hidden>
+      <div class="timeline__bar">
+        <button type="button" class="play press" id="playButton" aria-label="Lecture">
+          <svg class="icon-play" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5v11l9.5-5.5z" /></svg>
+          <svg class="icon-pause" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2.5" width="3.5" height="11" rx="1" /><rect x="9.5" y="2.5" width="3.5" height="11" rx="1" /></svg>
+        </button>
+        <span class="time"><span id="timeNow">0:00.0</span> <span class="muted">/ <span id="timeTotal">0:00.0</span></span></span>
+        <span class="clip" id="clipLength"></span>
+        <span class="timeline__hint muted">Espace : lecture. Glisse les bords pour couper.</span>
+      </div>
+
+      <div class="tracks" id="tracks">
+        <span></span>
+        <div class="ruler" id="ruler"></div>
+
+        <span class="track__label">Video</span>
+        <div class="lane lane--video" id="videoLane">
+          <canvas class="thumbs" id="thumbs"></canvas>
+          <div class="scrim scrim--before" id="scrimBefore"></div>
+          <div class="scrim scrim--after" id="scrimAfter"></div>
+          <div class="trim" id="trim" aria-label="Partie gardee">
+            <span class="handle" data-edge="start" aria-label="Debut du clip"></span>
+            <span class="handle" data-edge="end" aria-label="Fin du clip"></span>
+          </div>
+        </div>
+
+        <span class="track__label">
+          <button type="button" class="mute press" id="muteButton" aria-pressed="false">Son</button>
+        </span>
+        <div class="lane" id="audioLane">
+          <div class="audio-bar" id="audioBar"><span id="audioLabel">Son d'origine</span></div>
+        </div>
+
+        <span class="track__label">Texte</span>
+        <div class="lane" id="textLane">
+          <div class="text-bar" id="textBar">
+            <span class="handle" data-edge="start" aria-label="Apparition du texte"></span>
+            <span class="text-bar__label" id="textBarLabel"></span>
+            <span class="handle" data-edge="end" aria-label="Disparition du texte"></span>
+          </div>
+        </div>
+
+        <div class="playhead" id="playhead" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <footer class="foot">
+      <div class="foot__status">
+        <p class="status" id="status" role="status"></p>
+        <div class="progress" id="progress" hidden><div class="progress__fill" id="progressFill"></div></div>
+      </div>
+      <div class="foot__dir">
+        <span class="muted">Dossier</span>
+        <span class="foot__path" id="dirName">pas encore choisi</span>
+        <button type="button" class="link" id="dirButton">Changer</button>
+      </div>
+      <button type="button" class="btn btn--big press" id="saveButton" disabled>Enregistrer</button>
+      <button type="button" class="btn btn--lime btn--big press" id="sendButton" disabled>
+        <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8l11-5.5-3.5 11-2-4.5z" /></svg>
+        <span>Envoyer</span>
+      </button>
+    </footer>
+
+    <script src="editor.js"></script>
+  </body>
+</html>

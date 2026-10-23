@@ -43,6 +43,7 @@ declare global {
       unlink(): Promise<void>;
       setSettings(patch: Record<string, unknown>): Promise<AppState>;
       preview(): Promise<void>;
+      openEditor(): Promise<void>;
       checkUpdate(): Promise<void>;
       applyUpdate(): Promise<void>;
       identifyDisplays(): Promise<void>;
@@ -408,6 +409,10 @@ $<HTMLButtonElement>('launchAtLogin').addEventListener('click', () => {
 
 $<HTMLButtonElement>('closeButton').addEventListener('click', () => {
   void window.livememes.setSettings({ closeButton: !lastState?.closeButton });
+});
+
+$<HTMLButtonElement>('editorButton').addEventListener('click', () => {
+  void window.livememes.openEditor();
 });
 
 let previewTimer: ReturnType<typeof setTimeout> | undefined;

@@ -38,6 +38,7 @@ const builds = [
     entryPoints: [
       path.join(here, 'src/renderer/overlay.ts'),
       path.join(here, 'src/renderer/settings.ts'),
+      path.join(here, 'src/renderer/editor.ts'),
     ],
     outdir: path.join(here, 'dist/renderer'),
     format: 'iife',

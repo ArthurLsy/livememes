@@ -594,6 +594,18 @@ button:disabled { opacity: 0.5; cursor: default; }
 /* Actions et mises a jour                                                    */
 /* -------------------------------------------------------------------------- */
 
+/* Editeur : une ligne a lui, juste au-dessus des actions. */
+.btn--wide { width: 100%; }
+.btn--accent.btn--big { box-shadow: 0 5px 0 var(--accent-edge); }
+
+.btn--accent svg {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 .actions {
   display: flex;
   gap: var(--gap);
