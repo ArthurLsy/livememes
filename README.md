@@ -191,6 +191,29 @@ d'arrivee : chaque ecran a sa file de 8 memes en attente. File pleine, les
 nouveaux sont ignores ; un meme qui attend plus de 2 minutes saute.
 `/livememes clear` vide aussi la file.
 
+### Editeur : monter un meme sans quitter l'app
+
+"Ouvrir l'editeur" (fenetre de reglages, ou "Editeur..." dans la barre de menus)
+ouvre une fenetre de montage rapide, facon story :
+
+- **Import** d'une video (mp4, mov, webm), d'un GIF ou d'une photo (png, jpg,
+  webp), par le bouton ou en glissant le fichier sur la fenetre.
+- **Timeline a trois pistes** pour une video : la piste video se coupe par ses
+  bords (30 s maximum par clip), la piste son garde ou coupe le son d'origine, la
+  piste texte regle quand le texte apparait et disparait.
+- **Un texte** a placer a la souris sur l'image, avec la police, la taille (curseur
+  ou molette), la couleur et le contour au choix.
+- **Enregistrer** exporte le resultat dans un dossier choisi au premier
+  enregistrement, puis retenu.
+- **Envoyer** le balance dans ton salon vocal comme un `/meme`, avec les memes
+  options (taille, position, volume ou duree) et les memes regles (role,
+  cooldown, sourdine). Le bilan s'affiche dans l'editeur, rien n'est poste dans
+  Discord.
+
+L'export passe par un ffmpeg embarque dans l'app. Une video sort en mp4 (H.264),
+avec un debit calcule pour rester sous `MEDIA_MAX_BYTES` (25 Mo). Un GIF reste un
+GIF, une photo sort en png ou en jpg.
+
 ### Restreindre a un role
 
 `DROP_ROLE_ID` limite les memes aux porteurs d'un role, **a l'envoi comme a la
@@ -212,10 +235,15 @@ eligible. `/livememes status` indique combien de membres du vocal sont exclus.
 ## Construire l'app desktop
 
 ```bash
-npm run dist:desktop   # -> packages/desktop/release/
+npm run ffmpeg --workspace @livememes/desktop   # ffmpeg de l'editeur, une fois
+npm run dist:desktop                            # -> packages/desktop/release/
 ```
 
-Cible ta plateforme courante. Les binaires ne sont pas signes : macOS et Windows
+Cible ta plateforme courante. `npm run ffmpeg` telecharge le binaire ffmpeg de ta
+plateforme (builds `ffmpeg-static`, sha256 verifies) dans
+`packages/desktop/vendor/ffmpeg/`, d'ou electron-builder le reprend. Sans lui,
+l'editeur cherche `ffmpeg` dans le PATH. ffmpeg est distribue sous licence GPL :
+sa licence est livree a cote du binaire. Les binaires ne sont pas signes : macOS et Windows
 afficheront un avertissement au premier lancement.
 
 La charte graphique (couleurs, polices, composants, visuels d'installeur) est
@@ -262,7 +290,9 @@ npm test
 ```
 
 Couvre l'appairage, le relais WebSocket (livraison multi-ecrans, sourdine, cibles
-hors ligne) et le service de medias, sans avoir besoin d'un vrai bot Discord.
+hors ligne), l'envoi direct depuis l'editeur et le service de medias, sans avoir
+besoin d'un vrai bot Discord. Cote desktop : la logique de l'overlay, la timeline
+de l'editeur et les commandes ffmpeg qu'il genere.
 
 ## Limites connues
 

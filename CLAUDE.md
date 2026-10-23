@@ -28,6 +28,7 @@ npm run commands:deploy       # enregistre les slash commands aupres de Discord
 npm test                      # tests shared + serveur + logique overlay
 npm run typecheck             # tsc --noEmit sur les deux packages
 npm run dist:desktop          # binaire desktop -> packages/desktop/release/
+npm run ffmpeg -w @livememes/desktop   # ffmpeg de l'editeur -> packages/desktop/vendor/
 ```
 
 Un seul test :
@@ -84,6 +85,11 @@ gateway WS (`/ws`) et lance le client Discord.
   du CDN Discord sont signees et expirent, un `MemeDrop.url` doit toujours pointer
   sur `PUBLIC_URL/media/<id>`. Allowlist stricte de content-types (pas de HTML/SVG),
   coupe le stream au-dela de `MEDIA_MAX_BYTES`, purge par mtime.
+- `http/app.ts` — appairage, service des medias et `POST /api/drops` (envoi direct
+  depuis l'editeur du desktop). La route a besoin du bot pour trouver le salon
+  vocal : `createApp({ locateSender })` le recoit en injection (`bot/locate.ts`),
+  les tests passent un faux. `dispatch()` de `drop.ts` est le chemin commun avec
+  `/meme`.
 - `realtime/hub.ts` — registre en memoire des connexions, indexe par utilisateur
   Discord (plusieurs machines par utilisateur). `broadcast()` recoit l'ensemble des
   utilisateurs en sourdine en argument pour eviter un aller-retour SQLite par cible.
@@ -103,6 +109,11 @@ gateway WS (`/ws`) et lance le client Discord.
 - `main/overlay.ts` — une `BrowserWindow` par ecran cible : transparente, sans focus,
   `setIgnoreMouseEvents(true)` (ne bloque jamais un clic), always-on-top niveau
   `screen-saver` reapplique a chaque drop (un jeu plein ecran peut avoir repris le dessus).
+- `main/editor.ts` — editeur photo/video (fenetre `editor-window.ts`, UI
+  `renderer/editor.ts`). Le renderer dessine le texte sur un canvas (meme fonction
+  pour l'apercu et l'export, `text-layer.ts`) ; le main lance ffmpeg
+  (`edit-plan.ts` construit les arguments, `ffmpeg.ts` trouve le binaire). Les
+  photos sont composees directement par le canvas du renderer.
 - Renderers sans acces Node : tout passe par le `contextBridge` du preload, et
   toute navigation est bloquee dans `web-contents-created`.
 - Design : variables dans `renderer/tokens.css` (importe par settings et overlay),

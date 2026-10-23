@@ -67,12 +67,15 @@ jobs:
         include:
           - os: windows-latest
             args: ''
+            ffmpeg: win-x64
           # Les runners macOS sont arm64 : sans les deux arches, aucun binaire
           # pour les Mac Intel.
           - os: macos-latest
             args: '--x64 --arm64'
+            ffmpeg: mac-x64 mac-arm64
           - os: ubuntu-latest
             args: ''
+            ffmpeg: linux-x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -82,10 +85,16 @@ jobs:
       - run: npm ci
 
       # esbuild bundle main/preload/renderers dans dist/, electron-builder
-      # n'emballe que ca : le paquet n'a aucune dependance node_modules.
+      # n'emballe que ca (plus ffmpeg) : le paquet n'a aucune dependance node_modules.
       - name: Bundle
         working-directory: packages/desktop
         run: npm run build
+
+      # ffmpeg de l'editeur, une copie par arche packagee : electron-builder la
+      # reprend depuis vendor/ffmpeg/<os>-<arch> (extraResources).
+      - name: ffmpeg
+        working-directory: packages/desktop
+        run: node scripts/fetch-ffmpeg.mjs ${{ matrix.ffmpeg }}
 
       # Sans drapeau de plateforme, electron-builder cible celle du runner.
       - name: Packager

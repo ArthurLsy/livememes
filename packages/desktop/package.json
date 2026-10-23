@@ -12,6 +12,7 @@
     "start": "npm run build && electron .",
     "dist": "npm run build && electron-builder",
     "art": "node scripts/installer-art.mjs",
+    "ffmpeg": "node scripts/fetch-ffmpeg.mjs",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
@@ -33,6 +34,7 @@
     "productName": "LiveMemes",
     "icon": "assets/icon.png",
     "files": ["dist/**/*", "assets/**/*"],
+    "extraResources": [{ "from": "vendor/ffmpeg/${os}-${arch}", "to": "ffmpeg" }],
     "directories": { "output": "release" },
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "npmRebuild": false,

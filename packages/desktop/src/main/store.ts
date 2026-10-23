@@ -29,6 +29,8 @@ export interface Settings {
   closeButton: boolean;
   /** Appareil deja lie au moins une fois : le tutoriel saute alors la bienvenue. */
   onboarded: boolean;
+  /** Dossier ou l'editeur enregistre les memes, choisi au premier enregistrement. */
+  exportDir: string | null;
 }
 
 const DEFAULTS: Settings = {
@@ -40,6 +42,7 @@ const DEFAULTS: Settings = {
   launchAtLogin: false,
   closeButton: true,
   onboarded: false,
+  exportDir: null,
 };
 
 let file: string;

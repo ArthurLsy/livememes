@@ -16,6 +16,8 @@ import { pairErrorMessage } from '../renderer/onboarding.ts';
 import * as store from './store.ts';
 import * as overlay from './overlay.ts';
 import * as settingsWindow from './settings-window.ts';
+import * as editor from './editor.ts';
+import * as editorWindow from './editor-window.ts';
 import * as updater from './updater.ts';
 import { Connection, type ConnectionStatus } from './connection.ts';
 
@@ -74,6 +76,7 @@ function appState() {
 
 function broadcastState(): void {
   settingsWindow.push('app:state', appState());
+  editorWindow.push('editor:state', editor.state());
   renderTray();
 }
 
@@ -145,6 +148,7 @@ function renderTray(): void {
       },
       { type: 'separator' },
       { label: 'Apercu', click: () => overlay.preview() },
+      { label: 'Editeur...', click: () => editorWindow.open() },
       { label: 'Reglages...', click: () => settingsWindow.open() },
       { type: 'separator' },
       ...(updateItem ? [updateItem, { type: 'separator' } as const] : []),
@@ -213,6 +217,7 @@ async function pair(code: string): Promise<{ ok: true } | { ok: false; error: st
 app.whenReady().then(() => {
   store.load();
   overlay.init();
+  editor.init();
 
   // macOS : silhouette "Template" que le systeme recolore selon le theme.
   // Ailleurs : version couleur. Les variantes @2x sont chargees automatiquement.
@@ -291,6 +296,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('app:preview', () => overlay.preview());
 
+  ipcMain.handle('app:openEditor', () => {
+    editorWindow.open();
+  });
+
   ipcMain.handle('app:checkUpdate', () => updater.check());
 
   ipcMain.handle('app:applyUpdate', () => updater.apply());
@@ -315,6 +324,7 @@ app.on('before-quit', () => {
   quitting = true;
   connection.stop();
   overlay.destroyAll();
+  editor.cleanup();
 });
 
 // Aucune navigation ni ouverture de fenetre depuis les renderers.
