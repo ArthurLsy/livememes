@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { BrowserWindow, ipcMain, screen, type Display } from 'electron';
 import type { MemeDrop } from '@livememes/shared';
+import { hitsAny, sanitizeZones, type Zone } from './close-zones.ts';
 import * as store from './store.ts';
 
 const windows = new Map<number, BrowserWindow>();
@@ -11,15 +12,69 @@ const RENDERER = path.join(__dirname, '../renderer');
 const PRELOAD = path.join(__dirname, '../preload/index.cjs');
 
 /**
- * La croix de fermeture repose sur `forward: true`, qui transmet les mouvements
- * de souris au renderer d'une fenetre traversante. Electron ne le gere pas sous
- * Linux : la croix n'y serait jamais survolable, on ne l'affiche pas.
+ * La croix de fermeture repose sur le releve de la position du curseur par le
+ * main. Sous Wayland, Electron ne la connait pas hors de ses fenetres : par
+ * prudence, la croix n'est pas proposee sous Linux.
  */
 export const CLOSE_SUPPORTED = process.platform !== 'linux';
 
-/** Etat "traversant" par defaut : les clics passent, les mouvements remontent. */
+/** Etat "traversant" par defaut : la souris ne touche jamais l'overlay. */
 function passThrough(window: BrowserWindow): void {
-  window.setIgnoreMouseEvents(true, { forward: true });
+  window.setIgnoreMouseEvents(true);
+}
+
+/*
+ * Croix de fermeture. On ne s'appuie pas sur `forward: true` : la transmission
+ * des mouvements a une fenetre traversante et non focusable s'est revelee non
+ * fiable (croix inutilisable, #21). Le renderer declare
+ * ou sont ses croix, le main releve le curseur tant qu'il y en a une a l'ecran
+ * et ne rend la fenetre cliquable que pendant qu'il est dessus.
+ */
+const zones = new Map<BrowserWindow, Zone[]>();
+const interactive = new Set<BrowserWindow>();
+let cursorTimer: NodeJS.Timeout | null = null;
+
+/** Assez frequent pour qu'un survol paraisse instantane, negligeable en CPU. */
+const CURSOR_POLL_MS = 33;
+
+function setInteractive(window: BrowserWindow, on: boolean): void {
+  if (on === interactive.has(window)) return;
+  if (on) {
+    interactive.add(window);
+    window.setIgnoreMouseEvents(false);
+  } else {
+    interactive.delete(window);
+    passThrough(window);
+  }
+}
+
+function trackCursor(): void {
+  const cursor = screen.getCursorScreenPoint();
+  for (const [window, list] of zones) {
+    if (window.isDestroyed()) {
+      zones.delete(window);
+      interactive.delete(window);
+      continue;
+    }
+    const bounds = window.getContentBounds();
+    setInteractive(window, CLOSE_SUPPORTED && hitsAny(list, cursor.x - bounds.x, cursor.y - bounds.y));
+  }
+
+  const needed = zones.size > 0;
+  if (needed && !cursorTimer) cursorTimer = setInterval(trackCursor, CURSOR_POLL_MS);
+  if (!needed && cursorTimer) {
+    clearInterval(cursorTimer);
+    cursorTimer = null;
+  }
+}
+
+function setZones(window: BrowserWindow, list: Zone[]): void {
+  if (list.length > 0) zones.set(window, list);
+  else {
+    zones.delete(window);
+    setInteractive(window, false);
+  }
+  trackCursor();
 }
 
 /**
@@ -125,13 +180,12 @@ export function sync(): void {
 }
 
 export function init(): void {
-  // Le renderer survole ou quitte une croix de fermeture. On ne l'accepte que
-  // d'une fenetre d'overlay : la fenetre de reglages partage le preload.
-  ipcMain.on('overlay:interactive', (event, interactive: unknown) => {
+  // Le renderer declare ses croix de fermeture. On ne l'accepte que d'une
+  // fenetre d'overlay : la fenetre de reglages partage le preload.
+  ipcMain.on('overlay:closeZones', (event, raw: unknown) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (!window || ![...windows.values()].includes(window)) return;
-    if (interactive === true && CLOSE_SUPPORTED) window.setIgnoreMouseEvents(false);
-    else passThrough(window);
+    setZones(window, sanitizeZones(raw));
   });
 
   sync();
@@ -173,7 +227,7 @@ export function clear(dropId: string | null): void {
   each((window) => {
     window.webContents.send('overlay:clear', dropId);
     // Un meme retire sous la souris ne doit pas laisser la fenetre cliquable.
-    if (dropId === null) passThrough(window);
+    if (dropId === null) setZones(window, []);
   });
 }
 
