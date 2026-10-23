@@ -66,6 +66,7 @@ function appState() {
     displayList: overlay.listDisplays(),
     launchAtLogin: settings.launchAtLogin,
     closeButton: settings.closeButton,
+    topLeft: settings.topLeft,
     closeSupported: overlay.CLOSE_SUPPORTED,
     onboarded: settings.onboarded,
     status: lastStatus,
@@ -278,6 +279,7 @@ app.whenReady().then(() => {
     // Valeur ecrite telle quelle dans settings.json puis lue par overlay.sync().
     if (patch.displays !== undefined && !isDisplayChoice(patch.displays)) delete patch.displays;
     if (patch.closeButton !== undefined && typeof patch.closeButton !== 'boolean') delete patch.closeButton;
+    if (patch.topLeft !== undefined && typeof patch.topLeft !== 'boolean') delete patch.topLeft;
     store.update(patch);
 
     if (patch.muted !== undefined && patch.muted !== previous.muted) {

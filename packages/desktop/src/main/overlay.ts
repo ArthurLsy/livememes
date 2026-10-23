@@ -212,6 +212,7 @@ export function show(drop: MemeDrop): void {
   // Le volume local plafonne celui demande par l'expediteur.
   const payload = {
     ...drop,
+    position: settings.topLeft ? 'top-left' : drop.position,
     volume: drop.volume * settings.volume,
     closable: settings.closeButton && CLOSE_SUPPORTED,
   };
