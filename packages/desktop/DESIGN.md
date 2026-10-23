@@ -105,8 +105,8 @@ converti en traces.
   Zone cliquable elargie de 10 px autour du rond, recalee dans l'ecran quand le
   meme deborde.
 - L'overlay ne capte la souris que sur la croix : `pointer-events: none`
-  partout ailleurs, et la fenetre ne quitte `setIgnoreMouseEvents(true,
-  { forward: true })` que pendant son survol.
+  partout ailleurs, et la fenetre ne quitte `setIgnoreMouseEvents(true)` que
+  pendant que le curseur, releve par le main, est sur la croix.
 
 ## Mouvement et accessibilite
 
