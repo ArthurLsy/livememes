@@ -1,16 +1,21 @@
-LiveMemes change de look et apprend a se faire discret. Balance un meme depuis
-Discord, il s'affiche en plein ecran chez tous les membres de ton salon vocal.
+LiveMemes sait maintenant monter tes memes. Balance un meme depuis Discord ou
+depuis l'app, il s'affiche en plein ecran chez tous les membres de ton salon vocal.
 
 ![LiveMemes](https://raw.githubusercontent.com/ArthurLsy/livememes/main/docs/captures/overlay.png)
 
 ## Nouveau dans cette version
 
-- Nouveau design : fenetre de reglages, tutoriel, affichage des memes et
-  installeurs refaits dans la charte LiveMemes.
-- Une croix en haut a droite de chaque meme le ferme d'un clic, chez toi
-  seulement. `Ctrl+Alt+Shift+X` (`Cmd` sur macOS) ou le menu de la barre de
-  menus ferment tout. La croix se desactive dans les reglages (absente sous
-  Linux, ou seul le raccourci marche).
+- **Editeur photo et video** : "Ouvrir l'editeur" dans les reglages (ou
+  "Editeur..." dans la barre de menus). Importe une video, un GIF ou une photo,
+  coupe la video sur la timeline (30 s max), garde ou coupe le son, ajoute un
+  texte a placer a la souris et choisis quand il apparait. Puis **Enregistrer**
+  dans un dossier de ton choix, ou **Envoyer** directement dans ton salon vocal,
+  comme un `/meme`.
+- **Memes en haut a gauche** : nouveau reglage pour ceux qui n'ont qu'un ecran.
+  Tous les memes s'affichent dans ce coin chez toi, le centre reste libre pour
+  jouer.
+- **Croix de fermeture reparee** : elle ne reagissait pas. Survole-la, elle passe
+  au rouge, un clic ferme le meme chez toi.
 
 Depuis la 0.1.0, l'installeur Windows et l'AppImage se mettent a jour tout
 seuls : redemarre l'app quand elle le propose.
@@ -38,7 +43,8 @@ Les binaires ne sont pas signes :
    notification (Windows), pas dans la barre des taches.
 2. Suis le tutoriel : dans Discord, tape `/livememes link`, le bot te donne un
    code a coller dans l'app. Il n'y a aucune adresse de serveur a renseigner.
-3. Rejoins un salon vocal, puis `/meme url` ou `/meme fichier`.
+3. Rejoins un salon vocal, puis `/meme url` ou `/meme fichier`, ou passe par
+   l'editeur de l'app et clique sur Envoyer.
 
 Le meme s'affiche chez tous les membres du vocal qui ont l'app ouverte. Les
 reponses du bot sont privees : personne d'autre que toi ne les voit dans le
@@ -48,8 +54,8 @@ salon textuel.
 
 `/livememes mute` coupe la reception, `/livememes clear` efface ce qui est a
 l'ecran, `/livememes status` dit qui, dans ton vocal, peut recevoir des memes.
-Dans l'app : sourdine, volume, choix des ecrans d'affichage, lancement au
-demarrage.
+Dans l'app : sourdine, volume, choix des ecrans d'affichage, memes en haut a
+gauche, croix de fermeture, lancement au demarrage.
 
 L'overlay ne bloque jamais un clic : la souris le traverse.
 
