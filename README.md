@@ -186,6 +186,11 @@ dans la barre de menus ferment tout d'un coup. La croix se desactive dans les
 reglages ; elle n'existe pas sous Linux, ou Electron ne sait pas rendre une
 fenetre traversante sensible au survol (le raccourci et le menu marchent).
 
+Avec un seul ecran, le reglage "Memes en haut a gauche" de l'app affiche tous
+les memes dans ce coin chez toi, quelle que soit la `position` choisie par
+l'expediteur : le centre reste libre pour jouer. Les autres membres du vocal ne
+sont pas concernes.
+
 Plusieurs memes envoyes d'affilee s'affichent l'un apres l'autre, dans l'ordre
 d'arrivee : chaque ecran a sa file de 8 memes en attente. File pleine, les
 nouveaux sont ignores ; un meme qui attend plus de 2 minutes saute.

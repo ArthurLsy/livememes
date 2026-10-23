@@ -19,6 +19,7 @@ interface AppState {
   displayList: { id: number; label: string; primary: boolean; active: boolean }[];
   launchAtLogin: boolean;
   closeButton: boolean;
+  topLeft: boolean;
   /** Faux sous Linux : la fenetre traversante n'y remonte pas la souris. */
   closeSupported: boolean;
   onboarded: boolean;
@@ -255,6 +256,7 @@ function apply(state: AppState): void {
   const closeButton = $<HTMLButtonElement>('closeButton');
   closeButton.hidden = !state.closeSupported;
   closeButton.setAttribute('aria-checked', String(state.closeButton));
+  $<HTMLButtonElement>('topLeft').setAttribute('aria-checked', String(state.topLeft));
   applyDisplays(state);
   if (!draggingVolume) renderVolume(volumeLevel(state.volume));
 }
@@ -405,6 +407,10 @@ $<HTMLButtonElement>('identifyButton').addEventListener('click', () => {
 
 $<HTMLButtonElement>('launchAtLogin').addEventListener('click', () => {
   void window.livememes.setSettings({ launchAtLogin: !lastState?.launchAtLogin });
+});
+
+$<HTMLButtonElement>('topLeft').addEventListener('click', () => {
+  void window.livememes.setSettings({ topLeft: !lastState?.topLeft });
 });
 
 $<HTMLButtonElement>('closeButton').addEventListener('click', () => {

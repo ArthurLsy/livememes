@@ -27,6 +27,12 @@ export interface Settings {
   launchAtLogin: boolean;
   /** Croix discrete en haut a droite de chaque meme pour le fermer (#18). */
   closeButton: boolean;
+  /**
+   * Affiche tous les memes en haut a gauche sur cette machine, quelle que soit
+   * la position choisie par l'expediteur : avec un seul ecran, le centre est la
+   * ou l'on joue.
+   */
+  topLeft: boolean;
   /** Appareil deja lie au moins une fois : le tutoriel saute alors la bienvenue. */
   onboarded: boolean;
   /** Dossier ou l'editeur enregistre les memes, choisi au premier enregistrement. */
@@ -41,6 +47,7 @@ const DEFAULTS: Settings = {
   displays: 'primary',
   launchAtLogin: false,
   closeButton: true,
+  topLeft: false,
   onboarded: false,
   exportDir: null,
 };
