@@ -4,11 +4,12 @@ import { createApp } from './http/app.ts';
 import { attachGateway } from './realtime/gateway.ts';
 import { createBot } from './bot/client.ts';
 import { deployCommands } from './bot/deploy-commands.ts';
+import { senderLocator } from './bot/locate.ts';
 import { startCleanup } from './media/cache.ts';
 
-const server = createServer(createApp());
-const gateway = attachGateway(server);
 const bot = createBot();
+const server = createServer(createApp({ locateSender: senderLocator(bot) }));
+const gateway = attachGateway(server);
 
 startCleanup();
 

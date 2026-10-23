@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { MemeKind } from '@livememes/shared';
 import { config } from '../config.ts';
 import { MediaError } from './errors.ts';
@@ -86,6 +86,33 @@ export async function ingest(sourceUrl: string, policy?: FetchPolicy): Promise<C
 
   const file = path.join(mediaDir, `${id}.${allowed.ext}`);
   const bytes = await streamToFile(response.body, contentType, file);
+
+  index.set(id, { file, contentType, kind: allowed.kind });
+  return { id, kind: allowed.kind, contentType, bytes, url: publicUrlFor(id) };
+}
+
+/** Vrai si le content-type fait partie de l'allowlist. */
+export function isAllowedType(contentType: string): boolean {
+  return Object.hasOwn(ALLOWED, contentType);
+}
+
+/**
+ * Stocke un media envoye directement par un client (editeur du desktop), avec
+ * les memes garde-fous que `ingest` : allowlist, signature, taille max.
+ */
+export async function store(body: Readable, contentType: string): Promise<CachedMedia> {
+  const allowed = ALLOWED[contentType];
+  if (!allowed) {
+    body.destroy();
+    throw new MediaError(
+      `Type de fichier non supporte (${contentType || 'inconnu'}). Images, GIFs et videos courtes uniquement.`,
+    );
+  }
+
+  // Aleatoire : contrairement a `ingest`, aucune URL source ne permet de dedoublonner.
+  const id = randomBytes(16).toString('base64url');
+  const file = path.join(mediaDir, `${id}.${allowed.ext}`);
+  const bytes = await streamToFile(body, contentType, file);
 
   index.set(id, { file, contentType, kind: allowed.kind });
   return { id, kind: allowed.kind, contentType, bytes, url: publicUrlFor(id) };

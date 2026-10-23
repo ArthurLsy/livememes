@@ -1,6 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { ChatInputCommandInteraction, GuildMember, VoiceBasedChannel } from 'discord.js';
-import { MEME_SIZES, type MemeDrop, type MemeKind, type MemePosition, type MemeSize } from '@livememes/shared';
+import {
+  MEME_SIZES,
+  type DropAuthor,
+  type MemeDrop,
+  type MemeKind,
+  type MemePosition,
+  type MemeSize,
+} from '@livememes/shared';
 import { config } from '../config.ts';
 import * as media from '../media/cache.ts';
 import * as hub from '../realtime/hub.ts';
@@ -56,8 +63,7 @@ export function audienceOf(channel: VoiceBasedChannel): GuildMember[] {
   return humansOf(channel).filter(hasDropRole);
 }
 
-export interface BuildOptions {
-  sourceUrl: string;
+export interface DisplayOptions {
   /** Duree demandee via l'option `duree`, null pour la valeur par defaut. */
   durationMs: number | null;
   position: MemePosition;
@@ -66,9 +72,31 @@ export interface BuildOptions {
   caption: string | null;
 }
 
+export interface BuildOptions extends DisplayOptions {
+  sourceUrl: string;
+}
+
+/** Qui envoie, et a qui : tout ce que le drop retient du contexte Discord. */
+export interface DropSender {
+  author: DropAuthor;
+  guildName: string | null;
+  /** Ids des membres du salon vocal ayant le droit de recevoir le meme. */
+  audience: string[];
+}
+
+/**
+ * Resolution du salon vocal d'un utilisateur, pour un envoi qui ne vient pas
+ * d'une commande (editeur du client desktop). Implementee par le bot, injectee
+ * dans l'app HTTP : les tests la remplacent sans discord.js.
+ */
+export type SenderLookup =
+  | { ok: true; sender: DropSender; channelName: string }
+  | { ok: false; reason: 'not-in-voice' | 'no-role' };
+export type LocateSender = (userId: string) => Promise<SenderLookup>;
+
 export interface DeliveryReport {
   drop: MemeDrop;
-  audience: GuildMember[];
+  audience: string[];
   reached: string[];
   offline: string[];
   muted: string[];
@@ -102,7 +130,19 @@ export async function deliver(
   options: BuildOptions,
 ): Promise<DeliveryReport> {
   const cached = await media.ingest(options.sourceUrl);
+  return dispatch(cached, {
+    author: {
+      id: interaction.user.id,
+      username: interaction.user.displayName || interaction.user.username,
+      avatarUrl: interaction.user.displayAvatarURL({ size: 64, extension: 'png' }),
+    },
+    guildName: interaction.guild?.name ?? null,
+    audience: audienceOf(channel).map((member) => member.id),
+  }, options);
+}
 
+/** Construit le drop d'un media deja en cache et le pousse a l'audience. */
+export function dispatch(cached: media.CachedMedia, sender: DropSender, options: DisplayOptions): DeliveryReport {
   const drop: MemeDrop = {
     id: randomUUID(),
     url: cached.url,
@@ -112,26 +152,17 @@ export async function deliver(
     scale: MEME_SIZES[options.size],
     volume: options.volume,
     caption: options.caption,
-    author: {
-      id: interaction.user.id,
-      username: interaction.user.displayName || interaction.user.username,
-      avatarUrl: interaction.user.displayAvatarURL({ size: 64, extension: 'png' }),
-    },
-    guildName: interaction.guild?.name ?? null,
+    author: sender.author,
+    guildName: sender.guildName,
     sentAt: Date.now(),
   };
 
-  const audience = audienceOf(channel);
-  const mutedUsers = new Set(audience.filter((member) => isMuted(member.id)).map((member) => member.id));
+  const mutedUsers = new Set(sender.audience.filter((id) => isMuted(id)));
 
   trackDrop(drop.id);
-  const result = hub.broadcast(
-    audience.map((member) => member.id),
-    drop,
-    mutedUsers,
-  );
+  const result = hub.broadcast(sender.audience, drop, mutedUsers);
 
-  return { drop, audience, ...result };
+  return { drop, audience: sender.audience, ...result };
 }
 
 /** Nombre d'ecrans ayant confirme l'affichage (renseigne apres ~1s). */
