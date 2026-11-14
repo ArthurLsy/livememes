@@ -1,9 +1,14 @@
+import { randomBytes } from 'node:crypto';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import express from 'express';
 import {
   MEME_POSITIONS,
   MEME_SIZES,
   type DropUploadResponse,
+  type LibraryAddResponse,
   type LibraryResponse,
+  type LibraryVideo,
   type MemePosition,
   type MemeSize,
   type PairRequest,
@@ -20,6 +25,29 @@ import {
   type DisplayOptions,
   type LocateSender,
 } from '../bot/drop.ts';
+
+/** Ajouts a la banque par utilisateur : de quoi contribuer, pas de quoi la noyer. */
+const libraryAdds = new Map<string, number[]>();
+const LIBRARY_WINDOW_MS = 60 * 60 * 1000;
+export const LIBRARY_MAX_ADDS = 10;
+
+function canAddToLibrary(userId: string): boolean {
+  const now = Date.now();
+  const recent = (libraryAdds.get(userId) ?? []).filter((at) => at > now - LIBRARY_WINDOW_MS);
+  libraryAdds.set(userId, recent);
+  return recent.length < LIBRARY_MAX_ADDS;
+}
+
+function libraryVideo(entry: { id: string; title: string; tags: string[]; contentType: string; bytes: number }): LibraryVideo {
+  return {
+    id: entry.id,
+    title: entry.title,
+    tags: entry.tags,
+    url: `${config.http.publicUrl}/library/${entry.id}`,
+    contentType: entry.contentType,
+    bytes: entry.bytes,
+  };
+}
 
 /** Petit garde-fou anti brute-force sur les codes d'appairage (8 caracteres). */
 const pairAttempts = new Map<string, { count: number; resetAt: number }>();
@@ -216,18 +244,77 @@ export function createApp(options: AppOptions = {}): express.Express {
       res.status(401).json({ error: "Cet appareil n'est plus lie. Refais /livememes link dans Discord." });
       return;
     }
-    const payload: LibraryResponse = {
-      videos: library.list(config.library.dir).map((entry) => ({
-        id: entry.id,
-        title: entry.title,
-        tags: entry.tags,
-        url: `${config.http.publicUrl}/library/${entry.id}`,
-        contentType: entry.contentType,
-        bytes: entry.bytes,
-      })),
-    };
+    const payload: LibraryResponse = { videos: library.list(config.library.dir).map(libraryVideo) };
     res.setHeader('Cache-Control', 'no-store');
     res.json(payload);
+  });
+
+  /**
+   * Ajout a la banque depuis l'editeur : la video brute, sans texte. Publiee
+   * tout de suite pour tout le monde, d'ou la limite par utilisateur.
+   */
+  app.post('/api/library', async (req, res) => {
+    const refuse = (status: number, error: string): void => {
+      res.set('Connection', 'close').status(status).json({ error });
+      req.resume();
+    };
+
+    const device = findDeviceByToken(bearer(req.headers.authorization));
+    if (!device) {
+      refuse(401, "Cet appareil n'est plus lie. Refais /livememes link dans Discord.");
+      return;
+    }
+
+    const submission = library.parseSubmission(req.query.title, req.query.tags);
+    if (typeof submission === 'string') {
+      refuse(400, submission);
+      return;
+    }
+
+    const contentType = (req.headers['content-type'] ?? '').split(';')[0]!.trim().toLowerCase();
+    const ext = library.extensionFor(contentType);
+    if (!ext) {
+      refuse(415, 'La banque ne prend que des videos (mp4, webm ou mov).');
+      return;
+    }
+    if (Number(req.headers['content-length'] ?? 0) > config.media.maxBytes) {
+      refuse(413, `Video trop lourde (max ${Math.floor(config.media.maxBytes / 1024 / 1024)} Mo).`);
+      return;
+    }
+    if (!canAddToLibrary(device.id)) {
+      refuse(429, `Tu as deja ajoute ${LIBRARY_MAX_ADDS} videos cette heure-ci. Reessaie plus tard.`);
+      return;
+    }
+
+    const dir = config.library.dir;
+    let file: string;
+    let bytes: number;
+    let id: string;
+    try {
+      await fsp.mkdir(dir, { recursive: true });
+      id = library.freeId(dir, submission.title, ext, () => randomBytes(3).toString('hex'));
+      file = path.join(dir, `${id}${ext}`);
+      bytes = await media.streamToFile(req, contentType, file);
+    } catch (error) {
+      if (!(error instanceof media.MediaError)) console.error('[banque] echec du stockage', error);
+      const message = error instanceof media.MediaError ? error.message : 'Envoi interrompu.';
+      if (!res.headersSent) res.set('Connection', 'close').status(400).json({ error: message });
+      return;
+    }
+
+    try {
+      await library.append(dir, { id, ...submission, file: path.basename(file), addedBy: device.id });
+    } catch (error) {
+      console.error('[banque] catalogue non mis a jour', error);
+      await fsp.rm(file, { force: true });
+      res.status(500).json({ error: "La banque n'a pas pu etre mise a jour. Reessaie plus tard." });
+      return;
+    }
+
+    libraryAdds.get(device.id)?.push(Date.now());
+    console.log(`[banque] ${device.username} (${device.id}) a ajoute "${submission.title}" (${id})`);
+    const payload: LibraryAddResponse = { video: libraryVideo({ id, ...submission, contentType, bytes }) };
+    res.status(201).json(payload);
   });
 
   /**

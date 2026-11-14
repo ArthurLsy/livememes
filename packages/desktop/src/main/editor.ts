@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dialog, ipcMain, shell } from 'electron';
-import type { DropUploadResponse, LibraryResponse, LibraryVideo } from '@livememes/shared';
+import type { DropUploadResponse, LibraryAddResponse, LibraryResponse, LibraryVideo } from '@livememes/shared';
 import { MAX_IMAGE_SECONDS, SEND_POSITIONS, SEND_SIZES, type SendOptions } from '../renderer/editor-model.ts';
 import {
   gifArgs,
@@ -43,6 +43,8 @@ interface Source {
   name: string;
   kind: SourceKind;
   mime: string;
+  /** Video piochee dans la banque : inutile de proposer de l'y ajouter. */
+  fromLibrary: boolean;
 }
 
 /** Source telle que le renderer la recoit : une URL pour une video, les octets pour une image. */
@@ -52,6 +54,7 @@ export interface OpenedSource {
   mime: string;
   url: string | null;
   bytes: Uint8Array | null;
+  fromLibrary: boolean;
 }
 
 export interface RenderJob {
@@ -91,7 +94,7 @@ function humanBytes(bytes: number): string {
 /* Ouverture                                                                  */
 /* -------------------------------------------------------------------------- */
 
-async function openSource(file: string, displayName?: string): Promise<Result<{ source: OpenedSource }>> {
+async function openSource(file: string, displayName?: string, fromLibrary = false): Promise<Result<{ source: OpenedSource }>> {
   const type = SOURCES[path.extname(file).toLowerCase()];
   if (!type) return { ok: false, error: 'Format non supporte. Ouvre une video (mp4, mov, webm), un GIF ou une photo.' };
 
@@ -109,7 +112,7 @@ async function openSource(file: string, displayName?: string): Promise<Result<{ 
     bytes = await fsp.readFile(file);
   }
 
-  source = { file, name: displayName ?? path.basename(file), ...type };
+  source = { file, name: displayName ?? path.basename(file), ...type, fromLibrary };
   lastRender = null;
   return {
     ok: true,
@@ -119,6 +122,7 @@ async function openSource(file: string, displayName?: string): Promise<Result<{ 
       mime: type.mime,
       url: type.kind === 'video' ? pathToFileURL(file).href : null,
       bytes,
+      fromLibrary,
     },
   };
 }
@@ -185,7 +189,7 @@ async function openLibraryVideo(id: unknown): Promise<Result<{ source: OpenedSou
 
     const file = path.join(await ensureWorkDir(), `banque-${video.id}${ext}`);
     await fsp.writeFile(file, data);
-    return await openSource(file, video.title);
+    return await openSource(file, video.title, true);
   } catch {
     return { ok: false, error: 'Telechargement interrompu. Verifie ta connexion et reessaie.' };
   }
@@ -389,6 +393,52 @@ async function send(job: RenderJob, rawOptions: unknown): Promise<Result<{ repor
 }
 
 /* -------------------------------------------------------------------------- */
+/* Ajout a la banque                                                          */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Ajoute la video ouverte a la banque, en version brute : le passage coupe et
+ * le son choisis, mais sans le texte (la banque ne garde que des videos sans
+ * phrase incrustee, chacun ajoute la sienne).
+ */
+async function addToLibrary(job: RenderJob, rawMeta: unknown): Promise<Result<{ video: LibraryVideo }>> {
+  const { token } = store.get();
+  if (!token) return { ok: false, error: "Lie d'abord l'app a ton compte Discord (fenetre de reglages)." };
+  if (!source || source.kind !== 'video') return { ok: false, error: 'La banque ne prend que des videos.' };
+  if (source.fromLibrary) return { ok: false, error: 'Cette video vient deja de la banque.' };
+
+  const meta = (typeof rawMeta === 'object' && rawMeta !== null ? rawMeta : {}) as Record<string, unknown>;
+  const title = typeof meta.title === 'string' ? meta.title.trim() : '';
+  const tags = typeof meta.tags === 'string' ? meta.tags : '';
+  if (!title) return { ok: false, error: 'Donne un titre a la video.' };
+
+  const request = parseRenderRequest(job.request, 'video');
+  if (!request || request.kind !== 'video') return { ok: false, error: 'Montage invalide.' };
+  const rendered = await render({ request: { ...request, text: null }, overlay: null, photo: null });
+  const body = await fsp.readFile(rendered.file);
+
+  const { http } = store.endpoints(store.SERVER_URL);
+  editorWindow.push('editor:progress', null);
+  let response: Response;
+  try {
+    response = await fetch(`${http}/api/library?${new URLSearchParams({ title, tags })}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': rendered.mime },
+      body,
+      signal: AbortSignal.timeout(120_000),
+    });
+  } catch {
+    return { ok: false, error: 'Serveur injoignable. Verifie ta connexion internet et reessaie.' };
+  }
+  if (response.status === 404) return { ok: false, error: "Le serveur ne permet pas encore d'ajouter a la banque." };
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: payload.error ?? `Ajout refuse (HTTP ${response.status}).` };
+  }
+  return { ok: true, video: ((await response.json()) as LibraryAddResponse).video };
+}
+
+/* -------------------------------------------------------------------------- */
 
 export function state() {
   const settings = store.get();
@@ -428,6 +478,8 @@ export function init(): void {
   handle('editor:library', () => fetchLibrary());
 
   handle('editor:openLibrary', (id: unknown) => openLibraryVideo(id));
+
+  handle('editor:addToLibrary', (job: RenderJob, meta: unknown) => exclusive(() => addToLibrary(job, meta)));
 
   handle('editor:chooseDir', async () => {
     await chooseDir();

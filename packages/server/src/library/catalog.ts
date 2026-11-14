@@ -132,3 +132,80 @@ export function list(dir: string): LibraryEntry[] {
 export function find(dir: string, id: string): LibraryEntry | null {
   return list(dir).find((entry) => entry.id === id) ?? null;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Ajouts depuis l'editeur                                                    */
+/* -------------------------------------------------------------------------- */
+
+/** Extension du fichier ecrit pour un type video accepte. */
+export function extensionFor(contentType: string): string | null {
+  return Object.entries(VIDEO_TYPES).find(([, type]) => type === contentType)?.[0] ?? null;
+}
+
+/** "Chat surpris !" -> "chat-surpris", borne pour laisser la place au suffixe. */
+export function slugify(title: string): string {
+  const slug = title
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+    .replace(/-+$/, '');
+  return slug || 'video';
+}
+
+/** Titre et tags saisis par l'utilisateur ; renvoie un message d'erreur sinon. */
+export function parseSubmission(rawTitle: unknown, rawTags: unknown): { title: string; tags: string[] } | string {
+  const title = typeof rawTitle === 'string' ? rawTitle.trim().replace(/\s+/g, ' ') : '';
+  if (!title) return 'Donne un titre a la video.';
+  if (title.length > MAX_TITLE) return `Titre trop long (${MAX_TITLE} caracteres max).`;
+  const tags = typeof rawTags === 'string' ? rawTags.split(',') : [];
+  return {
+    title,
+    tags: [...new Set(tags.map((tag) => tag.trim().toLowerCase().replace(/^#/, '')).filter((tag) => tag && tag.length <= MAX_TAG))].slice(
+      0,
+      MAX_TAGS,
+    ),
+  };
+}
+
+/** Les ecritures du catalogue passent une par une : deux ajouts simultanes ne s'ecrasent pas. */
+let writing: Promise<unknown> = Promise.resolve();
+
+/**
+ * Ajoute au catalogue une video deja ecrite dans le dossier de la banque.
+ * Ecriture atomique (fichier temporaire puis renommage) : un lecteur ne voit
+ * jamais un catalogue a moitie ecrit. Les entrees existantes, meme invalides,
+ * sont gardees telles quelles.
+ */
+export function append(dir: string, entry: { id: string; title: string; tags: string[]; file: string; addedBy: string }): Promise<void> {
+  const task = writing.then(async () => {
+    const manifest = path.join(dir, MANIFEST);
+    let data: { videos: unknown[] } & Record<string, unknown> = { videos: [] };
+    try {
+      const parsed = JSON.parse(await fs.promises.readFile(manifest, 'utf8')) as Record<string, unknown>;
+      if (!Array.isArray(parsed.videos)) throw new Error(`${MANIFEST} sans liste "videos"`);
+      data = parsed as typeof data;
+    } catch (error) {
+      // Un catalogue illisible ne doit pas etre ecrase par un ajout : on refuse.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    data.videos.push({ ...entry, addedAt: new Date().toISOString() });
+    const temp = `${manifest}.${process.pid}.tmp`;
+    await fs.promises.writeFile(temp, `${JSON.stringify(data, null, 2)}\n`);
+    await fs.promises.rename(temp, manifest);
+  });
+  writing = task.catch(() => {});
+  return task;
+}
+
+/** Id libre : le slug du titre et un suffixe aleatoire court. */
+export function freeId(dir: string, title: string, ext: string, random: () => string): string {
+  const base = slugify(title);
+  const taken = new Set(list(dir).map((entry) => entry.id));
+  for (;;) {
+    const id = `${base}-${random()}`;
+    if (!taken.has(id) && !fs.existsSync(path.join(dir, `${id}${ext}`))) return id;
+  }
+}

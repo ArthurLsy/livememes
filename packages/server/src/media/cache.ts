@@ -122,9 +122,10 @@ const DISGUISED_MESSAGE = "Le contenu du fichier ne correspond pas a son type an
 
 /**
  * Ecrit le corps sur disque en coupant des que la taille max est depassee, et
- * verifie la signature des premiers octets contre le type annonce.
+ * verifie la signature des premiers octets contre le type annonce. Le fichier
+ * est supprime en cas d'echec. Exporte pour la banque de memes.
  */
-async function streamToFile(body: Readable, contentType: string, file: string): Promise<number> {
+export async function streamToFile(body: Readable, contentType: string, file: string): Promise<number> {
   const handle = await fsp.open(file, 'w');
   let written = 0;
   let head: Buffer | null = Buffer.alloc(0); // null une fois la signature validee
