@@ -5,17 +5,14 @@ depuis l'app, il s'affiche en plein ecran chez tous les membres de ton salon voc
 
 ## Nouveau dans cette version
 
-- **Editeur photo et video** : "Ouvrir l'editeur" dans les reglages (ou
-  "Editeur..." dans la barre de menus). Importe une video, un GIF ou une photo,
-  coupe la video sur la timeline (30 s max), garde ou coupe le son, ajoute un
-  texte a placer a la souris et choisis quand il apparait. Puis **Enregistrer**
-  dans un dossier de ton choix, ou **Envoyer** directement dans ton salon vocal,
-  comme un `/meme`.
-- **Memes en haut a gauche** : nouveau reglage pour ceux qui n'ont qu'un ecran.
-  Tous les memes s'affichent dans ce coin chez toi, le centre reste libre pour
-  jouer.
-- **Croix de fermeture reparee** : elle ne reagissait pas. Survole-la, elle passe
-  au rouge, un clic ferme le meme chez toi.
+- **Qui est dans le vocal** : une colonne d'avatars sur le cote de l'ecran
+  montre les membres de ton salon vocal. Pastille verte : il voit les memes ;
+  grise : il n'a pas l'app ouverte ; orange barree : il est en sourdine. Cote,
+  taille et ecran se reglent dans l'app, et elle se masque quand tu es seul.
+- **Banque de memes** : dans l'editeur, "Banque de memes" propose des videos
+  brutes, sans texte. Pioches-en une, ajoute ta phrase et envoie.
+- **Memes dans les coins** : un grand meme en haut a gauche (ou dans un autre
+  coin) n'est plus coupe a moitie, il se cale dans le coin.
 
 Depuis la 0.1.0, l'installeur Windows et l'AppImage se mettent a jour tout
 seuls : redemarre l'app quand elle le propose.
