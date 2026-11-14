@@ -20,6 +20,10 @@ interface AppState {
   launchAtLogin: boolean;
   closeButton: boolean;
   topLeft: boolean;
+  presenceShow: boolean;
+  presenceSide: 'left' | 'right';
+  presenceSize: 'small' | 'medium' | 'large';
+  presenceDisplay: number | null;
   /** Faux sous Linux : la fenetre traversante n'y remonte pas la souris. */
   closeSupported: boolean;
   onboarded: boolean;
@@ -224,6 +228,42 @@ function applyDisplays({ displays, displayList }: AppState): void {
   hint.textContent = 'Aucun ecran choisi parmi ceux branches : affichage sur l\'ecran principal.';
 }
 
+/** Colonne du vocal : options visibles seulement quand elle est activee. */
+function applyPresence(state: AppState): void {
+  $<HTMLButtonElement>('presenceShow').setAttribute('aria-checked', String(state.presenceShow));
+  $<HTMLElement>('presenceOptions').hidden = !state.presenceShow;
+
+  for (const choice of document.querySelectorAll<HTMLButtonElement>('[data-presence-side]')) {
+    choice.setAttribute('aria-checked', String(choice.dataset.presenceSide === state.presenceSide));
+  }
+  for (const choice of document.querySelectorAll<HTMLButtonElement>('[data-presence-size]')) {
+    choice.setAttribute('aria-checked', String(choice.dataset.presenceSize === state.presenceSize));
+  }
+
+  // Seuls les ecrans qui affichent des memes peuvent porter la colonne ; le
+  // choix n'a d'interet qu'a partir de deux.
+  const active = state.displayList.filter((display) => display.active);
+  $<HTMLElement>('presenceDisplayRow').hidden = active.length < 2;
+  const current =
+    active.find((display) => display.id === state.presenceDisplay) ??
+    active.find((display) => display.primary) ??
+    active[0];
+  $<HTMLElement>('presenceDisplays').replaceChildren(
+    ...active.map((display) => {
+      const choice = document.createElement('button');
+      choice.type = 'button';
+      choice.className = 'choice press';
+      choice.setAttribute('role', 'radio');
+      choice.setAttribute('aria-checked', String(display.id === current?.id));
+      // Le libelle commence par le numero affiche par "Identifier".
+      choice.textContent = `Ecran ${display.label.split('.')[0]}${display.primary ? ' (principal)' : ''}`;
+      choice.title = display.label;
+      choice.addEventListener('click', () => void window.livememes.setSettings({ presenceDisplay: display.id }));
+      return choice;
+    }),
+  );
+}
+
 function apply(state: AppState): void {
   lastState = state;
   step = nextStep(step, wasLinked, state);
@@ -258,6 +298,7 @@ function apply(state: AppState): void {
   closeButton.setAttribute('aria-checked', String(state.closeButton));
   $<HTMLButtonElement>('topLeft').setAttribute('aria-checked', String(state.topLeft));
   applyDisplays(state);
+  applyPresence(state);
   if (!draggingVolume) renderVolume(volumeLevel(state.volume));
 }
 
@@ -412,6 +453,18 @@ $<HTMLButtonElement>('launchAtLogin').addEventListener('click', () => {
 $<HTMLButtonElement>('topLeft').addEventListener('click', () => {
   void window.livememes.setSettings({ topLeft: !lastState?.topLeft });
 });
+
+$<HTMLButtonElement>('presenceShow').addEventListener('click', () => {
+  void window.livememes.setSettings({ presenceShow: !lastState?.presenceShow });
+});
+
+for (const choice of document.querySelectorAll<HTMLButtonElement>('[data-presence-side]')) {
+  choice.addEventListener('click', () => void window.livememes.setSettings({ presenceSide: choice.dataset.presenceSide }));
+}
+
+for (const choice of document.querySelectorAll<HTMLButtonElement>('[data-presence-size]')) {
+  choice.addEventListener('click', () => void window.livememes.setSettings({ presenceSize: choice.dataset.presenceSize }));
+}
 
 $<HTMLButtonElement>('closeButton').addEventListener('click', () => {
   void window.livememes.setSettings({ closeButton: !lastState?.closeButton });

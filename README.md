@@ -192,6 +192,18 @@ les memes dans ce coin chez toi, quelle que soit la `position` choisie par
 l'expediteur : le centre reste libre pour jouer. Les autres membres du vocal ne
 sont pas concernes.
 
+### Qui est dans le vocal
+
+L'app affiche sur un cote de l'ecran les avatars des membres de ton salon
+vocal (role requis compris, bots exclus), sans pseudo, avec une pastille :
+verte s'ils recoivent les memes, grise s'ils n'ont pas d'overlay connecte,
+orange barree s'ils sont en sourdine. La colonne se masque quand tu n'es dans
+aucun salon ou que tu y es seul, et resume les gros salons en "+N". Cote,
+taille et ecran se reglent dans l'app ; la colonne ne capte jamais la souris.
+
+Vie privee : tous les membres du salon voient ainsi si ton overlay est installe
+et actif. Pour apparaitre comme sans overlay, ferme l'app.
+
 Plusieurs memes envoyes d'affilee s'affichent l'un apres l'autre, dans l'ordre
 d'arrivee : chaque ecran a sa file de 8 memes en attente. File pleine, les
 nouveaux sont ignores ; un meme qui attend plus de 2 minutes saute.

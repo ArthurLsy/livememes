@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { BrowserWindow, ipcMain, screen, type Display } from 'electron';
-import type { MemeDrop } from '@livememes/shared';
+import type { MemeDrop, PresenceMember } from '@livememes/shared';
+import { presenceView } from '../renderer/presence-view.ts';
 import { hitsAny, sanitizeZones, type Zone } from './close-zones.ts';
 import * as store from './store.ts';
 
@@ -122,6 +123,8 @@ function createForDisplay(display: Display): BrowserWindow {
 
   void window.loadFile(path.join(RENDERER, 'overlay.html'));
   window.once('ready-to-show', () => window.showInactive());
+  // Une fenetre (re)creee ne connait pas encore la colonne de presence.
+  window.webContents.on('did-finish-load', () => renderPresence());
 
   return window;
 }
@@ -177,6 +180,8 @@ export function sync(): void {
     }
     windows.set(display.id, createForDisplay(display));
   }
+  // L'ecran de la colonne a pu disparaitre des cibles.
+  renderPresence();
 }
 
 export function init(): void {
@@ -194,15 +199,49 @@ export function init(): void {
   screen.on('display-metrics-changed', sync);
 }
 
-function each(callback: (window: BrowserWindow) => void): void {
+function each(callback: (window: BrowserWindow, displayId: number) => void): void {
   for (const [id, window] of windows) {
     if (window.isDestroyed()) {
       windows.delete(id);
       continue;
     }
     if (identifyOnly.has(id)) continue;
-    callback(window);
+    callback(window, id);
   }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Colonne de presence (#22)                                                  */
+/* -------------------------------------------------------------------------- */
+
+let presenceMembers: PresenceMember[] = [];
+
+/**
+ * Ecran de la colonne : celui choisi s'il affiche des memes, sinon le
+ * principal, sinon le premier ecran cible. Une seule colonne, meme sur
+ * plusieurs ecrans : elle ferait doublon.
+ */
+function presenceDisplay(): number | null {
+  const targets = [...windows.keys()].filter((id) => !identifyOnly.has(id));
+  const chosen = store.get().presenceDisplay;
+  if (chosen !== null && targets.includes(chosen)) return chosen;
+  const primary = screen.getPrimaryDisplay().id;
+  return targets.includes(primary) ? primary : (targets[0] ?? null);
+}
+
+/** Renvoie la colonne a jour a chaque fenetre : celle de l'ecran choisi l'affiche, les autres la masquent. */
+export function renderPresence(): void {
+  const settings = store.get();
+  const view = settings.presenceShow ? presenceView(presenceMembers, settings.user?.id ?? null) : null;
+  const target = presenceDisplay();
+  const payload = view && { ...view, side: settings.presenceSide, size: settings.presenceSize };
+  each((window, id) => window.webContents.send('overlay:presence', id === target ? payload : null));
+}
+
+/** Liste recue du serveur ; vide hors salon vocal ou hors connexion. */
+export function setPresence(members: PresenceMember[]): void {
+  presenceMembers = members;
+  renderPresence();
 }
 
 export function show(drop: MemeDrop): void {

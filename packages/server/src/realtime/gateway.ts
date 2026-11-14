@@ -3,6 +3,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { PROTOCOL_VERSION, isClientMessage } from '@livememes/shared';
 import { findDeviceByToken, isMuted, setMuted, touchDevice } from '../store/devices.ts';
 import * as hub from './hub.ts';
+import * as presence from './presence.ts';
 
 const HEARTBEAT_MS = 30_000;
 
@@ -47,6 +48,8 @@ export function attachGateway(server: Server): WebSocketServer {
       user: { id: device.id, username: device.username, avatarUrl: device.avatarUrl },
       muted: isMuted(device.id),
     });
+    // Sans attendre le regroupement : la colonne s'affiche des la connexion.
+    hub.send(socket, { t: 'presence', members: presence.snapshotFor(device.id) });
 
     socket.on('message', (raw) => {
       let parsed: unknown;
@@ -72,6 +75,7 @@ export function attachGateway(server: Server): WebSocketServer {
         case 'setMuted':
           setMuted(device.id, parsed.muted);
           hub.sendToUser(device.id, { t: 'muted', muted: parsed.muted });
+          presence.touch(device.id);
           break;
       }
     });

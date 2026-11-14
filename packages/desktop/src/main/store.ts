@@ -12,6 +12,11 @@ export const SERVER_URL = process.env.LIVEMEMES_SERVER ?? 'https://meme.gowey.fr
 
 export type DisplayChoice = 'primary' | 'all' | number[];
 
+export const PRESENCE_SIDES = ['left', 'right'] as const;
+export type PresenceSide = (typeof PRESENCE_SIDES)[number];
+export const PRESENCE_SIZES = ['small', 'medium', 'large'] as const;
+export type PresenceSize = (typeof PRESENCE_SIZES)[number];
+
 export interface Settings {
   token: string | null;
   user: { id: string; username: string; avatarUrl: string | null } | null;
@@ -33,6 +38,12 @@ export interface Settings {
    * ou l'on joue.
    */
   topLeft: boolean;
+  /** Colonne des membres du salon vocal sur le cote de l'ecran (#22). */
+  presenceShow: boolean;
+  presenceSide: PresenceSide;
+  presenceSize: PresenceSize;
+  /** Ecran de la colonne (`display.id`) ; null ou debranche : l'ecran principal. */
+  presenceDisplay: number | null;
   /** Appareil deja lie au moins une fois : le tutoriel saute alors la bienvenue. */
   onboarded: boolean;
   /** Dossier ou l'editeur enregistre les memes, choisi au premier enregistrement. */
@@ -48,6 +59,10 @@ const DEFAULTS: Settings = {
   launchAtLogin: false,
   closeButton: true,
   topLeft: false,
+  presenceShow: true,
+  presenceSide: 'right',
+  presenceSize: 'medium',
+  presenceDisplay: null,
   onboarded: false,
   exportDir: null,
 };

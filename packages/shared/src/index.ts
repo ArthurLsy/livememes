@@ -61,6 +61,20 @@ export interface MemeDrop {
   sentAt: number;
 }
 
+/**
+ * Etat d'un membre du salon vocal dans la colonne de presence (#22) :
+ * - `online` : un overlay connecte, recoit les memes ;
+ * - `offline` : dans le salon sans overlay connecte, ne recoit rien ;
+ * - `muted` : overlay connecte mais en sourdine via /livememes mute.
+ */
+export type PresenceState = 'online' | 'offline' | 'muted';
+
+export interface PresenceMember {
+  id: string;
+  avatarUrl: string | null;
+  state: PresenceState;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Serveur -> client                                                          */
 /* -------------------------------------------------------------------------- */
@@ -77,6 +91,12 @@ export type ServerMessage =
   /** Retire un drop encore affiche (moderation, /livememes clear). */
   | { t: 'clear'; dropId: string | null }
   | { t: 'muted'; muted: boolean }
+  /**
+   * Membres eligibles du salon vocal de l'utilisateur, lui compris ; liste vide
+   * s'il n'est dans aucun salon. Envoye apres `hello` puis a chaque changement.
+   * Message additif : un overlay ancien ignore les types qu'il ne connait pas.
+   */
+  | { t: 'presence'; members: PresenceMember[] }
   | { t: 'pong'; ts: number }
   | { t: 'error'; code: string; message: string };
 

@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits, MessageFlags } from 'discord.js';
 import { config } from '../config.ts';
 import { commands } from './commands/index.ts';
+import { trackVoicePresence } from './presence.ts';
 
 export function createBot(): Client {
   const client = new Client({
@@ -14,6 +15,8 @@ export function createBot(): Client {
   client.once(Events.ClientReady, (ready) => {
     console.log(`[bot] connecte en tant que ${ready.user.tag}`);
   });
+
+  trackVoicePresence(client);
 
   client.on(Events.InteractionCreate, async (interaction) => {
     if (interaction.isAutocomplete()) {
