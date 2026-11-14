@@ -1,7 +1,7 @@
 {
   "name": "livememes",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Balance des memes en plein ecran chez tous les membres d'un salon vocal Discord.",
   "type": "module",
   "engines": {
