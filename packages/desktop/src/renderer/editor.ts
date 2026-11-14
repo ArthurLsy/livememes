@@ -1,5 +1,5 @@
 import type { DropUploadResponse, LibraryVideo } from '@livememes/shared';
-import { filterLibrary } from './library-model.ts';
+import { filterLibrary, titleFromName } from './library-model.ts';
 import type { RenderRequest, SourceKind } from '../main/edit-plan.ts';
 import {
   clamp,
@@ -39,6 +39,8 @@ interface OpenedSource {
   mime: string;
   url: string | null;
   bytes: Uint8Array | null;
+  /** Video piochee dans la banque : pas de proposition d'ajout. */
+  fromLibrary: boolean;
 }
 
 interface RenderJob {
@@ -58,6 +60,7 @@ declare global {
       chooseDir(): Promise<EditorState>;
       library(): Promise<Result<{ videos: LibraryVideo[] }>>;
       openLibrary(id: string): Promise<Result<{ source: OpenedSource }>>;
+      addToLibrary(job: RenderJob, meta: { title: string; tags: string }): Promise<Result<{ video: LibraryVideo }>>;
       save(job: RenderJob): Promise<Result<{ name: string; dir: string }>>;
       send(job: RenderJob, options: SendOptions): Promise<Result<{ report: DropUploadResponse }>>;
       reveal(): Promise<void>;
@@ -106,6 +109,8 @@ let source: Loaded | null = null;
 let trim: Range = { start: 0, end: 0 };
 let muted = false;
 let busy = false;
+/** La video ouverte est deja dans la banque : on arrete de proposer de l'y ajouter. */
+let addedToLibrary = false;
 const send: SendOptions = { ...DEFAULT_SEND };
 
 const text: TextLayer = {
@@ -157,6 +162,9 @@ function renderButtons(): void {
   sendButton.title = app.linked ? '' : "Lie l'app a ton compte Discord pour envoyer";
   $<HTMLElement>('openButton').hidden = !source;
   $<HTMLButtonElement>('libraryButton').disabled = busy;
+  const addButton = $<HTMLButtonElement>('addLibraryButton');
+  addButton.hidden = !canOfferLibrary();
+  addButton.disabled = busy;
   $<HTMLButtonElement>('libraryPickButton').disabled = busy;
 
   // Le nom du dossier suffit ; le chemin complet reste au survol.
@@ -232,6 +240,7 @@ async function load(result: Result<{ source: OpenedSource }> | null): Promise<vo
   }
 
   source = { ...opened, width, height, duration, objectUrl };
+  addedToLibrary = false;
   trim = opened.kind === 'video' ? initialTrim(duration) : { start: 0, end: 0 };
   text.range = { ...trim };
 
@@ -920,16 +929,19 @@ async function run(action: 'save' | 'send'): Promise<void> {
   renderButtons();
   setStatus(loaded.kind === 'video' ? 'Export de la video...' : 'Preparation...');
   setProgress(loaded.kind === 'photo' ? null : 0);
+  let succeeded = false;
 
   try {
     const job = await buildJob(loaded);
     if (action === 'save') {
       const result = await window.editor.save(job);
+      succeeded = result.ok;
       if (result.ok) setStatus(`Enregistre : ${result.name}`, 'ok', { label: 'Afficher', run: () => void window.editor.reveal() });
       else setStatus(result.error, 'error');
       app = await window.editor.getState();
     } else {
       const result = await window.editor.send(job, { ...send });
+      succeeded = result.ok;
       if (result.ok) setStatus(sendSummary(result.report), 'ok');
       else setStatus(result.error, 'error');
     }
@@ -941,7 +953,81 @@ async function run(action: 'save' | 'send'): Promise<void> {
     setProgress(false);
     renderButtons();
   }
+  // Meme reussi avec une video a soi : on propose de la partager, a chaque fois
+  // tant qu'elle n'est pas dans la banque.
+  if (succeeded) offerLibrary();
 }
+
+/* -------------------------------------------------------------------------- */
+/* Ajout a la banque : propose avec insistance, jamais impose                 */
+/* -------------------------------------------------------------------------- */
+
+const offerDialog = $<HTMLDialogElement>('offerDialog');
+const offerName = $<HTMLInputElement>('offerName');
+const offerTags = $<HTMLInputElement>('offerTags');
+const offerError = $<HTMLElement>('offerError');
+
+/** Une video a soi, pas encore ajoutee, et un appareil lie pour l'envoyer. */
+function canOfferLibrary(): boolean {
+  return source?.kind === 'video' && !source.fromLibrary && !addedToLibrary && app.linked;
+}
+
+function offerLibrary(): void {
+  if (!source || !canOfferLibrary() || offerDialog.open) return;
+  if (!offerName.value) offerName.value = titleFromName(source.name);
+  offerError.hidden = true;
+  offerDialog.showModal();
+  offerName.select();
+}
+
+async function addToLibrary(): Promise<void> {
+  if (!source || busy || source.kind !== 'video') return;
+  const title = offerName.value.trim();
+  if (!title) {
+    offerError.hidden = false;
+    offerError.textContent = 'Donne un titre a la video.';
+    offerName.focus();
+    return;
+  }
+
+  offerDialog.close();
+  pause();
+  busy = true;
+  renderButtons();
+  setStatus('Preparation de la video pour la banque...');
+  setProgress(0);
+  try {
+    // Version brute : coupe et son conserves, texte jamais incruste.
+    const job: RenderJob = {
+      request: { kind: 'video', width: source.width, height: source.height, trim: { ...trim }, muted, text: null },
+      overlay: null,
+      photo: null,
+    };
+    const result = await window.editor.addToLibrary(job, { title, tags: offerTags.value });
+    if (result.ok) {
+      addedToLibrary = true;
+      offerName.value = '';
+      offerTags.value = '';
+      setStatus(`Merci ! "${result.video.title}" est dans la banque, dispo pour tout le monde.`, 'ok');
+    } else {
+      setStatus(result.error, 'error', { label: 'Reessayer', run: offerLibrary });
+    }
+  } catch (error) {
+    console.error(error);
+    setStatus("L'ajout a la banque a echoue. Reessaie.", 'error');
+  } finally {
+    busy = false;
+    setProgress(false);
+    renderButtons();
+  }
+}
+
+$<HTMLFormElement>('offerForm').addEventListener('submit', (event) => {
+  event.preventDefault();
+  void addToLibrary();
+});
+$<HTMLButtonElement>('offerLater').addEventListener('click', () => offerDialog.close());
+$<HTMLButtonElement>('addLibraryButton').addEventListener('click', offerLibrary);
 
 saveButton.addEventListener('click', () => void run('save'));
 sendButton.addEventListener('click', () => void run('send'));

@@ -240,7 +240,16 @@ puis on l'envoie comme n'importe quel meme. La banque vit sur le serveur, c'est
 nous qui l'alimentons : ajouter une video ne demande pas de nouvelle version de
 l'app.
 
-Pour ajouter une video, depose le fichier (mp4, webm ou mov) dans
+**Ajout depuis l'editeur.** Apres chaque enregistrement ou envoi d'une video a
+soi, l'editeur propose (fenetre modale) de l'ajouter a la banque, tant qu'elle
+n'y est pas ; le bouton "Ajouter a la banque" reste aussi disponible. Rien n'est
+obligatoire : "Pas cette fois" ferme la fenetre. Seule la version brute part
+(passage coupe et son choisis, **sans le texte**), avec un titre et des tags.
+Elle est publiee tout de suite pour tout le monde, sans validation ; chaque
+personne est limitee a 10 ajouts par heure, et l'auteur est note (`addedBy`)
+dans `library.json`. Pour retirer une video, supprime son entree du catalogue.
+
+Pour ajouter une video a la main, depose le fichier (mp4, webm ou mov) dans
 `data/library/` (dans le volume `/app/data` en Docker, ou `LIBRARY_DIR`), puis
 decris-le dans `data/library/library.json` :
 

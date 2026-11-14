@@ -146,6 +146,7 @@
         <span class="foot__path" id="dirName">pas encore choisi</span>
         <button type="button" class="link" id="dirButton">Changer</button>
       </div>
+      <button type="button" class="btn btn--big btn--violet press" id="addLibraryButton" hidden>Ajouter a la banque</button>
       <button type="button" class="btn btn--big press" id="saveButton" disabled>Enregistrer</button>
       <button type="button" class="btn btn--lime btn--big press" id="sendButton" disabled>
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8l11-5.5-3.5 11-2-4.5z" /></svg>
@@ -164,6 +165,32 @@
       <input type="search" class="library__search" id="librarySearch" placeholder="Rechercher (titre, tag)" autocomplete="off" />
       <p class="muted library__state" id="libraryState" role="status"></p>
       <div class="library__grid" id="libraryGrid"></div>
+    </dialog>
+
+    <dialog class="offer card" id="offerDialog" aria-labelledby="offerTitle">
+      <form method="dialog" class="offer__form" id="offerForm">
+        <div class="offer__badge" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M10 9.5v5l4.5-2.5z" /></svg>
+        </div>
+        <h2 id="offerTitle">Ajoute cette video a la banque !</h2>
+        <p class="muted">
+          Tout le monde pourra la piocher dans la banque de memes et y mettre sa propre phrase.
+          Seule la video coupee part, <strong>sans ton texte</strong>.
+        </p>
+        <label class="offer__field">
+          <span class="label">Titre</span>
+          <input type="text" id="offerName" maxlength="80" required autocomplete="off" placeholder="Ex. : Chat surpris" />
+        </label>
+        <label class="offer__field">
+          <span class="label">Tags <span class="muted">(facultatif, separes par des virgules)</span></span>
+          <input type="text" id="offerTags" maxlength="200" autocomplete="off" placeholder="Ex. : chat, reaction" />
+        </label>
+        <p class="offer__error" id="offerError" role="alert" hidden></p>
+        <div class="offer__actions">
+          <button type="button" class="btn btn--big press" id="offerLater">Pas cette fois</button>
+          <button type="submit" class="btn btn--lime btn--big press" id="offerConfirm">Ajouter a la banque</button>
+        </div>
+      </form>
     </dialog>
 
     <script src="editor.js"></script>

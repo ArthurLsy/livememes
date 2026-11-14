@@ -187,6 +187,15 @@ export interface LibraryResponse {
   videos: LibraryVideo[];
 }
 
+/**
+ * `POST /api/library?title=...&tags=a,b` : ajoute une video a la banque depuis
+ * l'editeur. Corps = la video brute (sans texte), type dans `Content-Type`,
+ * token de l'appareil dans `Authorization: Bearer`. Publiee tout de suite.
+ */
+export interface LibraryAddResponse {
+  video: LibraryVideo;
+}
+
 /** Reponse d'un envoi reussi : de quoi afficher le bilan dans l'editeur. */
 export interface DropUploadResponse {
   channelName: string;

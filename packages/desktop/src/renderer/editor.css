@@ -211,6 +211,92 @@ button:disabled { opacity: 0.5; cursor: default; }
 /* Banque de memes (#28)                                                      */
 /* -------------------------------------------------------------------------- */
 
+.btn--violet {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn--violet.btn--big { box-shadow: 0 5px 0 var(--accent-edge); }
+
+/* Proposition d'ajout a la banque : modale, impossible a rater, jamais obligatoire. */
+.offer {
+  width: min(460px, calc(100vw - 48px));
+  margin: auto;
+  padding: 26px 26px 22px;
+  border: 0;
+  color: var(--text);
+  box-shadow: 0 0 0 4px var(--accent), 0 12px 0 4px var(--accent-edge);
+}
+
+.offer[open] { animation: offer-in 360ms cubic-bezier(0.16, 1.24, 0.4, 1) both; }
+
+.offer::backdrop { background: var(--scrim); }
+
+.offer__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.offer__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-icon);
+  background: var(--lime);
+}
+
+.offer__badge svg {
+  fill: none;
+  stroke: var(--bg);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.offer h2 { font: 700 19px/1.3 var(--font-display); }
+
+.offer__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.offer__field input {
+  height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--r-small);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 14px var(--font-body);
+}
+
+.offer__field input:focus-visible { outline: 2px solid var(--lime); }
+
+.offer__error {
+  color: var(--red-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.offer__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+@keyframes offer-in {
+  from { opacity: 0; transform: translateY(24px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offer[open] { animation: none; }
+}
+
 .library {
   width: min(880px, calc(100vw - 48px));
   max-height: calc(100vh - 48px);

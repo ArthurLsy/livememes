@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { LibraryVideo } from '@livememes/shared';
-import { filterLibrary, normalize } from '../src/renderer/library-model.ts';
+import { filterLibrary, normalize, titleFromName } from '../src/renderer/library-model.ts';
 
 const video = (id: string, title: string, tags: string[] = []): LibraryVideo => ({
   id,
@@ -35,5 +35,12 @@ describe('banque de memes', () => {
   it('exige tous les mots de la recherche', () => {
     assert.deepEqual(filterLibrary(videos, 'reaction chat').map((entry) => entry.id), ['chat']);
     assert.deepEqual(filterLibrary(videos, 'reaction sport'), []);
+  });
+});
+
+describe('titre propose pour la banque', () => {
+  it('part du nom de fichier, sans extension ni numero de copie', () => {
+    assert.equal(titleFromName('chat_surpris-final (1).mp4'), 'chat surpris final');
+    assert.equal(titleFromName('Foule.en.delire.mov'), 'Foule en delire');
   });
 });

@@ -20,6 +20,8 @@ const { createApp } = await import('../src/http/app.ts');
 const { createPairingCode, redeemPairingCode } = await import('../src/store/devices.ts');
 const catalog = await import('../src/library/catalog.ts');
 type LibraryResponse = import('@livememes/shared').LibraryResponse;
+type LibraryAddResponse = import('@livememes/shared').LibraryAddResponse;
+const { LIBRARY_MAX_ADDS } = await import('../src/http/app.ts');
 
 let server: Server;
 let baseUrl: string;
@@ -128,5 +130,83 @@ describe('routes de la banque', () => {
   it('repond 404 pour une video inconnue ou un id malforme', async () => {
     assert.equal((await fetch(`${baseUrl}/library/inconnue`)).status, 404);
     assert.equal((await fetch(`${baseUrl}/library/..%2Fsecret.mp4`)).status, 404);
+  });
+});
+
+/** Debut valide d'un MP4 : boite ftyp, assez pour la verification de signature. */
+const MP4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(64, 1)]);
+
+function addVideo(query: string, body: Buffer = MP4, type = 'video/mp4', auth = token) {
+  return fetch(`${baseUrl}/api/library?${query}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${auth}`, 'content-type': type },
+    body,
+  });
+}
+
+describe('ajout a la banque', () => {
+  it('nettoie titre et tags', () => {
+    assert.deepEqual(catalog.parseSubmission('  Chat   surpris ', '#Chat, reaction,,chat'), {
+      title: 'Chat surpris',
+      tags: ['chat', 'reaction'],
+    });
+    assert.equal(typeof catalog.parseSubmission('', ''), 'string');
+    assert.equal(catalog.slugify('Été à fond !!'), 'ete-a-fond');
+    assert.equal(catalog.slugify('???'), 'video');
+  });
+
+  it('publie la video tout de suite dans le catalogue', async () => {
+    writeCatalog([{ id: 'chat', title: 'Chat surpris', file: 'chat.mp4' }]);
+    const response = await addVideo(new URLSearchParams({ title: 'Foule en délire', tags: 'sport, joie' }).toString());
+    assert.equal(response.status, 201);
+    const { video } = (await response.json()) as LibraryAddResponse;
+    assert.match(video.id, /^foule-en-delire-[0-9a-f]{6}$/);
+    assert.deepEqual(video.tags, ['sport', 'joie']);
+    assert.equal(video.url, `https://memes.example/library/${video.id}`);
+
+    const listed = ((await (await getLibrary()).json()) as LibraryResponse).videos;
+    assert.deepEqual(listed.map((entry) => entry.id), ['chat', video.id]);
+    assert.deepEqual(Buffer.from(await (await fetch(`${baseUrl}/library/${video.id}`)).arrayBuffer()), MP4);
+
+    // Les entrees existantes et la trace de l'auteur sont gardees.
+    const manifest = JSON.parse(fs.readFileSync(path.join(libraryDir, catalog.MANIFEST), 'utf8'));
+    assert.equal(manifest.videos[1].addedBy, '400000000000000001');
+  });
+
+  it('refuse sans appareil, sans titre, hors video ou deguise', async () => {
+    assert.equal((await addVideo('title=x', MP4, 'video/mp4', 'inconnu')).status, 401);
+    assert.equal((await addVideo('title=')).status, 400);
+    assert.equal((await addVideo('title=x', Buffer.from('GIF89a........'), 'image/gif')).status, 415);
+    assert.equal((await addVideo('title=x', Buffer.from('<html>pas une video</html>'))).status, 400);
+  });
+
+  it('n ecrase pas un catalogue illisible', async () => {
+    const file = path.join(libraryDir, catalog.MANIFEST);
+    fs.writeFileSync(file, '{ casse');
+    assert.equal((await addVideo('title=Test')).status, 500);
+    assert.equal(fs.readFileSync(file, 'utf8'), '{ casse');
+    writeCatalog([]);
+  });
+
+  it('limite le nombre d ajouts par heure', async () => {
+    writeCatalog([]);
+    const { code } = createPairingCode({ id: '400000000000000009', username: 'Pressé', avatarUrl: null });
+    const other = redeemPairingCode(code, 'PC')!.token;
+    for (let i = 0; i < LIBRARY_MAX_ADDS; i++) {
+      assert.equal((await addVideo(`title=Video ${i}`, MP4, 'video/mp4', other)).status, 201);
+    }
+    assert.equal((await addVideo('title=Une de trop', MP4, 'video/mp4', other)).status, 429);
+  });
+
+  it('serialise les ajouts simultanes', async () => {
+    writeCatalog([]);
+    const { code } = createPairingCode({ id: '400000000000000010', username: 'Rapide', avatarUrl: null });
+    const fast = redeemPairingCode(code, 'PC')!.token;
+    const statuses = await Promise.all(
+      Array.from({ length: 5 }, (_, i) => addVideo(`title=Parallele ${i}`, MP4, 'video/mp4', fast).then((r) => r.status)),
+    );
+    assert.deepEqual(statuses, [201, 201, 201, 201, 201]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(libraryDir, catalog.MANIFEST), 'utf8'));
+    assert.equal(manifest.videos.length, 5);
   });
 });

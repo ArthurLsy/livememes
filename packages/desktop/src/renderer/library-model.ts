@@ -21,3 +21,14 @@ export function filterLibrary(videos: readonly LibraryVideo[], query: string): L
     return words.every((word) => haystack.includes(word));
   });
 }
+
+/** "chat_surpris-final (1).mp4" -> "chat surpris final" : un titre de depart a corriger. */
+export function titleFromName(name: string): string {
+  return name
+    .replace(/\.[^.]+$/, '')
+    .replace(/\(\d+\)/g, '')
+    .replace(/[_\-.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+}
