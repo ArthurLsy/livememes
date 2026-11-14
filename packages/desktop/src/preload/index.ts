@@ -18,6 +18,10 @@ contextBridge.exposeInMainWorld('overlay', {
   onIdentify: (handler: (payload: { number: number; durationMs: number }) => void) => {
     ipcRenderer.on('overlay:identify', (_event, payload: { number: number; durationMs: number }) => handler(payload));
   },
+  /** Colonne de presence (#22) ; null la masque sur cet ecran. */
+  onPresence: (handler: (payload: unknown) => void) => {
+    ipcRenderer.on('overlay:presence', (_event, payload: unknown) => handler(payload));
+  },
 });
 
 /** API de la fenetre de reglages. */

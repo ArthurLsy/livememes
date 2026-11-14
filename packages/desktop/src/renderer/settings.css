@@ -488,6 +488,58 @@ button:disabled { opacity: 0.5; cursor: default; }
 .tile[aria-checked='true'] .icon-off { display: none; }
 
 /* -------------------------------------------------------------------------- */
+/* Colonne de presence (#22)                                                  */
+/* -------------------------------------------------------------------------- */
+
+.presence-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.option-row__label {
+  flex: none;
+  width: 52px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.choices {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+}
+
+.choices--wrap { flex-wrap: wrap; }
+
+.choice {
+  flex: 1;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-small);
+  background: var(--surface-2);
+  box-shadow: 0 3px 0 var(--edge);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.choice[aria-checked='true'] {
+  background: var(--accent);
+  box-shadow: 0 3px 0 var(--accent-edge);
+  color: #fff;
+}
+
+.presence-note { font-size: 12px; }
+
+/* -------------------------------------------------------------------------- */
 /* Ecrans                                                                     */
 /* -------------------------------------------------------------------------- */
 

@@ -15,6 +15,7 @@ import {
   unlinkAll,
 } from '../../store/devices.ts';
 import * as hub from '../../realtime/hub.ts';
+import * as presence from '../../realtime/presence.ts';
 import { audienceOf, humansOf, resolveVoiceChannel } from '../drop.ts';
 
 export const data = new SlashCommandBuilder()
@@ -128,6 +129,7 @@ async function mute(interaction: ChatInputCommandInteraction): Promise<void> {
 
   setMuted(interaction.user.id, next);
   hub.sendToUser(interaction.user.id, { t: 'muted', muted: next });
+  presence.touch(interaction.user.id);
 
   await interaction.reply({
     content: next

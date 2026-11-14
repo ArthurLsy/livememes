@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import WebSocket from 'ws';
-import type { ClientMessage, MemeDrop, ServerMessage } from '@livememes/shared';
+import type { ClientMessage, MemeDrop, PresenceMember, ServerMessage } from '@livememes/shared';
 import * as store from './store.ts';
 
 export type ConnectionStatus = 'offline' | 'connecting' | 'online' | 'unauthorized';
@@ -10,9 +10,20 @@ interface Events {
   drop: [MemeDrop];
   clear: [string | null];
   muted: [boolean];
+  presence: [PresenceMember[]];
 }
 
 const BACKOFF_MS = [1000, 2000, 5000, 10_000, 30_000];
+
+function isPresenceMember(value: unknown): value is PresenceMember {
+  if (typeof value !== 'object' || value === null) return false;
+  const member = value as Record<string, unknown>;
+  return (
+    typeof member.id === 'string' &&
+    (member.avatarUrl === null || (typeof member.avatarUrl === 'string' && member.avatarUrl.startsWith('https://'))) &&
+    (member.state === 'online' || member.state === 'offline' || member.state === 'muted')
+  );
+}
 
 /**
  * Connexion persistante au relais, avec reconnexion exponentielle.
@@ -107,6 +118,10 @@ export class Connection extends EventEmitter<Events> {
         case 'muted':
           store.update({ muted: message.muted });
           this.emit('muted', message.muted);
+          break;
+        case 'presence':
+          // Le serveur est la source : on ne garde que des entrees bien formees.
+          if (Array.isArray(message.members)) this.emit('presence', message.members.filter(isPresenceMember));
           break;
         case 'error':
           if (message.code === 'unauthorized' || message.code === 'unlinked') {

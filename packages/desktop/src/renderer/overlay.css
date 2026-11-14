@@ -237,12 +237,114 @@ body {
   animation: drop-in 420ms cubic-bezier(0.16, 1.24, 0.4, 1) both;
 }
 
+/*
+ * Colonne de presence (#22) : avatars des membres du salon vocal, facon
+ * colonne de membres Discord. Discrete (opacite reduite, fond voile) et
+ * jamais cliquable, comme le reste de l'overlay.
+ */
+.presence {
+  --size: clamp(28px, 3.4vh, 46px);
+  position: absolute;
+  top: 50%;
+  right: var(--edge);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--size) * 0.28);
+  padding: calc(var(--size) * 0.3) calc(var(--size) * 0.24);
+  border-radius: var(--r-pill);
+  background: rgba(13, 18, 38, 0.55);
+  box-shadow: 0 0 0 1px rgba(238, 241, 255, 0.08);
+  opacity: 0;
+  transform: translate(12px, -50%);
+  transition: opacity 260ms ease, transform 260ms ease;
+}
+
+.presence[data-side='left'] {
+  right: auto;
+  left: var(--edge);
+  transform: translate(-12px, -50%);
+}
+
+.presence[data-size='small'] { --size: clamp(22px, 2.6vh, 36px); }
+.presence[data-size='large'] { --size: clamp(36px, 4.6vh, 62px); }
+
+.presence.is-visible {
+  opacity: 0.88;
+  transform: translate(0, -50%);
+}
+
+.presence__member {
+  position: relative;
+  width: var(--size);
+  height: var(--size);
+  flex: none;
+}
+
+/* Sans avatar Discord (ou s'il echoue) : silhouette neutre, pas de pseudo. */
+.presence__avatar {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 38%, var(--screen-lit) 0 18%, transparent 19%),
+    radial-gradient(ellipse 34% 26% at 50% 86%, var(--screen-lit) 0 99%, transparent 100%),
+    var(--raised);
+  transition: opacity 200ms ease, filter 200ms ease;
+}
+
+.presence__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Pastille d'etat, detouree sur le fond de la colonne. */
+.presence__dot {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 36%;
+  height: 36%;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 0 max(2px, calc(var(--size) * 0.07)) var(--bg);
+}
+
+/* Sans overlay connecte : ne recoit rien, avatar estompe. */
+.presence__member[data-state='offline'] .presence__avatar { opacity: 0.45; filter: grayscale(1); }
+.presence__member[data-state='offline'] .presence__dot { background: var(--screen-dim); }
+
+/* En sourdine : connecte mais ne recoit pas, pastille orange barree. */
+.presence__member[data-state='muted'] .presence__avatar { opacity: 0.7; }
+.presence__member[data-state='muted'] .presence__dot {
+  background:
+    linear-gradient(135deg, transparent 42%, var(--bg) 42% 58%, transparent 58%),
+    var(--orange);
+}
+
+.presence__more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: 700 calc(var(--size) * 0.34) / 1 var(--font-display);
+}
+
 /* Mouvement reduit : un simple fondu, sans chute ni rebond. */
 @media (prefers-reduced-motion: reduce) {
   .drop,
   .identify { animation-name: fade-in; animation-timing-function: ease-out; }
   .drop.leaving { animation-name: fade-out; animation-timing-function: ease-in; }
   .drop__close { transition: none; }
+  .presence,
+  .presence[data-side='left'],
+  .presence.is-visible { transform: translate(0, -50%); }
 }
 
 @keyframes fade-in {

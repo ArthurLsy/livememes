@@ -206,6 +206,43 @@
           <span class="tile__track"><span class="tile__knob"></span></span>
         </button>
 
+        <button type="button" role="switch" aria-checked="false" class="tile tile--row press" id="presenceShow">
+          <span class="tile__icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><circle cx="18" cy="16.5" r="2.5" /></svg>
+          </span>
+          <span class="tile__text">
+            <span class="tile__title">Qui est dans le vocal</span>
+            <span class="tile__sub">Avatars du salon sur le cote, pastille verte s'ils voient les memes</span>
+          </span>
+          <span class="tile__track"><span class="tile__knob"></span></span>
+        </button>
+
+        <section class="card panel" id="presenceOptions" hidden>
+          <div class="panel__head"><h2>Colonne du vocal</h2></div>
+          <div class="presence-options">
+            <div class="option-row">
+              <span class="option-row__label" id="presenceSideLabel">Cote</span>
+              <div class="choices" role="radiogroup" aria-labelledby="presenceSideLabel">
+                <button type="button" role="radio" aria-checked="false" class="choice press" data-presence-side="left">Gauche</button>
+                <button type="button" role="radio" aria-checked="false" class="choice press" data-presence-side="right">Droite</button>
+              </div>
+            </div>
+            <div class="option-row">
+              <span class="option-row__label" id="presenceSizeLabel">Taille</span>
+              <div class="choices" role="radiogroup" aria-labelledby="presenceSizeLabel">
+                <button type="button" role="radio" aria-checked="false" class="choice press" data-presence-size="small">Petite</button>
+                <button type="button" role="radio" aria-checked="false" class="choice press" data-presence-size="medium">Moyenne</button>
+                <button type="button" role="radio" aria-checked="false" class="choice press" data-presence-size="large">Grande</button>
+              </div>
+            </div>
+            <div class="option-row" id="presenceDisplayRow" hidden>
+              <span class="option-row__label" id="presenceDisplayLabel">Ecran</span>
+              <div class="choices choices--wrap" role="radiogroup" aria-labelledby="presenceDisplayLabel" id="presenceDisplays"></div>
+            </div>
+            <p class="muted presence-note">Les autres membres du salon voient aussi si ton overlay est actif.</p>
+          </div>
+        </section>
+
         <section class="card panel">
           <div class="panel__head">
             <h2 id="screensTitle">Ecrans d'affichage</h2>

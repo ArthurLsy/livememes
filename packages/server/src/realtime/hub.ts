@@ -15,6 +15,17 @@ interface Connection {
 const byUser = new Map<string, Set<Connection>>();
 const bySocket = new WeakMap<WebSocket, Connection>();
 
+/** Appele quand un utilisateur passe en ligne ou hors ligne (premiere/derniere machine). */
+const onlineListeners = new Set<(userId: string) => void>();
+
+export function onOnlineChange(listener: (userId: string) => void): void {
+  onlineListeners.add(listener);
+}
+
+function notifyOnline(userId: string): void {
+  for (const listener of onlineListeners) listener(userId);
+}
+
 export function add(socket: WebSocket, userId: string, deviceName: string, token: string): Connection {
   const connection: Connection = { socket, userId, deviceName, token };
   let set = byUser.get(userId);
@@ -24,6 +35,7 @@ export function add(socket: WebSocket, userId: string, deviceName: string, token
   }
   set.add(connection);
   bySocket.set(socket, connection);
+  if (set.size === 1) notifyOnline(userId);
   return connection;
 }
 
@@ -35,7 +47,10 @@ export function remove(socket: WebSocket): void {
   const set = byUser.get(connection.userId);
   if (!set) return;
   set.delete(connection);
-  if (set.size === 0) byUser.delete(connection.userId);
+  if (set.size === 0) {
+    byUser.delete(connection.userId);
+    notifyOnline(connection.userId);
+  }
 }
 
 export function get(socket: WebSocket): Connection | undefined {

@@ -67,6 +67,10 @@ function appState() {
     launchAtLogin: settings.launchAtLogin,
     closeButton: settings.closeButton,
     topLeft: settings.topLeft,
+    presenceShow: settings.presenceShow,
+    presenceSide: settings.presenceSide,
+    presenceSize: settings.presenceSize,
+    presenceDisplay: settings.presenceDisplay,
     closeSupported: overlay.CLOSE_SUPPORTED,
     onboarded: settings.onboarded,
     status: lastStatus,
@@ -232,6 +236,8 @@ app.whenReady().then(() => {
     const revoked = status === 'unauthorized' && lastStatus !== 'unauthorized' && !store.get().token;
     lastStatus = status;
     lastDetail = detail;
+    // Hors connexion, la liste n'est plus suivie : mieux vaut ne rien montrer.
+    if (status !== 'online') overlay.setPresence([]);
     broadcastState();
     // Token refuse ou appareil delie depuis Discord : le tutoriel reprend a
     // l'etape /livememes link, encore faut-il que la fenetre soit ouverte.
@@ -240,6 +246,7 @@ app.whenReady().then(() => {
   connection.on('drop', (drop) => overlay.show(drop));
   connection.on('clear', (dropId) => overlay.clear(dropId));
   connection.on('muted', () => broadcastState());
+  connection.on('presence', (members) => overlay.setPresence(members));
 
   updater.onChange(broadcastState);
   updater.init();
@@ -280,6 +287,12 @@ app.whenReady().then(() => {
     if (patch.displays !== undefined && !isDisplayChoice(patch.displays)) delete patch.displays;
     if (patch.closeButton !== undefined && typeof patch.closeButton !== 'boolean') delete patch.closeButton;
     if (patch.topLeft !== undefined && typeof patch.topLeft !== 'boolean') delete patch.topLeft;
+    if (patch.presenceShow !== undefined && typeof patch.presenceShow !== 'boolean') delete patch.presenceShow;
+    if (patch.presenceSide !== undefined && !store.PRESENCE_SIDES.includes(patch.presenceSide)) delete patch.presenceSide;
+    if (patch.presenceSize !== undefined && !store.PRESENCE_SIZES.includes(patch.presenceSize)) delete patch.presenceSize;
+    if (patch.presenceDisplay !== undefined && patch.presenceDisplay !== null && !Number.isInteger(patch.presenceDisplay)) {
+      delete patch.presenceDisplay;
+    }
     store.update(patch);
 
     if (patch.muted !== undefined && patch.muted !== previous.muted) {
@@ -287,6 +300,9 @@ app.whenReady().then(() => {
     }
     if (patch.displays !== undefined) {
       overlay.sync();
+    }
+    if (Object.keys(patch).some((key) => key.startsWith('presence'))) {
+      overlay.renderPresence();
     }
     if (patch.launchAtLogin !== undefined) {
       app.setLoginItemSettings({ openAtLogin: patch.launchAtLogin });

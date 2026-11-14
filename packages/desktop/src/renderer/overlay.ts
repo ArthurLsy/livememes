@@ -1,4 +1,4 @@
-import type { MemeDrop } from '@livememes/shared';
+import type { MemeDrop, PresenceMember } from '@livememes/shared';
 import { initialOf } from './avatar.ts';
 import { nudge } from './close.ts';
 import { anchorFor, edgeFor, fitHeight } from './placement.ts';
@@ -14,6 +14,7 @@ declare global {
       setCloseZones(zones: { left: number; top: number; right: number; bottom: number }[]): void;
       onClear(handler: (dropId: string | null) => void): void;
       onIdentify(handler: (payload: { number: number; durationMs: number }) => void): void;
+      onPresence(handler: (payload: PresencePayload) => void): void;
     };
   }
 }
@@ -211,6 +212,70 @@ window.overlay.onClear((dropId) => {
   if (dropId) queue.remove(dropId);
   else queue.clear();
 });
+
+/* -------------------------------------------------------------------------- */
+/* Colonne de presence (#22)                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Purement visuelle : pas de pseudo, aucune interaction, la fenetre reste
+ * traversante. Le main a deja trie et tronque la liste (presenceView).
+ */
+type PresencePayload = {
+  shown: PresenceMember[];
+  hidden: number;
+  side: 'left' | 'right';
+  size: 'small' | 'medium' | 'large';
+} | null;
+
+const presence = document.getElementById('presence') as HTMLDivElement;
+/** Avatars deja construits, par membre : evite de recharger les images a chaque mise a jour. */
+const presenceItems = new Map<string, HTMLElement>();
+
+function presenceItem(member: PresenceMember): HTMLElement {
+  let item = presenceItems.get(member.id);
+  if (!item) {
+    item = document.createElement('span');
+    item.className = 'presence__member';
+    const avatar = document.createElement('span');
+    avatar.className = 'presence__avatar';
+    if (member.avatarUrl) {
+      const image = document.createElement('img');
+      image.src = member.avatarUrl;
+      image.alt = '';
+      image.addEventListener('error', () => image.remove());
+      avatar.append(image);
+    }
+    const dot = document.createElement('span');
+    dot.className = 'presence__dot';
+    item.append(avatar, dot);
+    presenceItems.set(member.id, item);
+  }
+  item.dataset.state = member.state;
+  return item;
+}
+
+function renderPresence(payload: PresencePayload): void {
+  presence.classList.toggle('is-visible', payload !== null);
+  // A la disparition, on garde le contenu le temps du fondu.
+  if (!payload) return;
+
+  presence.dataset.side = payload.side;
+  presence.dataset.size = payload.size;
+  const items = payload.shown.map(presenceItem);
+  const ids = new Set(payload.shown.map((member) => member.id));
+  for (const id of presenceItems.keys()) if (!ids.has(id)) presenceItems.delete(id);
+
+  if (payload.hidden > 0) {
+    const more = document.createElement('span');
+    more.className = 'presence__more';
+    more.textContent = `+${payload.hidden}`;
+    items.push(more);
+  }
+  presence.replaceChildren(...items);
+}
+
+window.overlay.onPresence(renderPresence);
 
 // Numero geant au centre de l'ecran, pour reperer quel ecran est lequel dans
 // les reglages.
