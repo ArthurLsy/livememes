@@ -164,6 +164,29 @@ export interface DropUploadQuery {
   duration?: number;
 }
 
+/* -------------------------------------------------------------------------- */
+/* HTTP : banque de memes video (#28)                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Video brute de la banque, sans texte incruste : l'utilisateur ajoute le sien
+ * dans l'editeur avant d'envoyer.
+ */
+export interface LibraryVideo {
+  id: string;
+  title: string;
+  tags: string[];
+  /** URL absolue du fichier, servie par le backend (`/library/<id>`). */
+  url: string;
+  contentType: string;
+  bytes: number;
+}
+
+/** `GET /api/library`, token de l'appareil dans `Authorization: Bearer`. */
+export interface LibraryResponse {
+  videos: LibraryVideo[];
+}
+
 /** Reponse d'un envoi reussi : de quoi afficher le bilan dans l'editeur. */
 export interface DropUploadResponse {
   channelName: string;

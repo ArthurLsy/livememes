@@ -95,6 +95,15 @@ export const config = {
     roleId: process.env.DROP_ROLE_ID || null,
   },
 
+  library: {
+    /**
+     * Banque de memes video (#28), alimentee par l'equipe : les fichiers et leur
+     * catalogue `library.json` dans ce dossier. Relu a chaque modification du
+     * catalogue, sans redemarrage.
+     */
+    dir: process.env.LIBRARY_DIR || path.join(process.env.DATA_DIR || path.join(repoRoot, 'data'), 'library'),
+  },
+
   pairing: {
     ttlMs: int('PAIRING_TTL_MS', 5 * 60 * 1000),
   },

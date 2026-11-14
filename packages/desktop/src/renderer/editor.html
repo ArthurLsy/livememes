@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; img-src file: data: blob:; media-src file: blob:; font-src file:; style-src 'unsafe-inline' file:; script-src 'self' file:;"
+      content="default-src 'none'; img-src file: data: blob:; media-src file: blob: https: http:; font-src file:; style-src 'unsafe-inline' file:; script-src 'self' file:;"
     />
     <title>LiveMemes - Editeur</title>
     <link rel="stylesheet" href="editor.css" />
@@ -14,6 +14,7 @@
       <img class="logo" src="logo.svg" alt="LiveMemes" />
       <span class="bar__title">Editeur</span>
       <span class="bar__file" id="fileName"></span>
+      <button type="button" class="btn btn--small press" id="libraryButton">Banque de memes</button>
       <button type="button" class="btn btn--small press" id="openButton" hidden>Changer de fichier</button>
     </header>
 
@@ -23,7 +24,10 @@
           <svg width="56" height="56" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="3" /><path d="M10 9.5v5l4.5-2.5z" /></svg>
           <h1>Glisse une video ou une photo ici</h1>
           <p class="muted">mp4, mov, webm, GIF, png, jpg ou webp. Un clip fait 30 secondes au plus.</p>
-          <button type="button" class="btn btn--lime btn--big press" id="pickButton">Choisir un fichier</button>
+          <div class="drop-zone__actions">
+            <button type="button" class="btn btn--lime btn--big press" id="pickButton">Choisir un fichier</button>
+            <button type="button" class="btn btn--big press" id="libraryPickButton">Piocher dans la banque</button>
+          </div>
         </div>
 
         <div class="frame" id="frame" hidden>
@@ -148,6 +152,19 @@
         <span>Envoyer</span>
       </button>
     </footer>
+
+    <dialog class="library card" id="libraryDialog" aria-labelledby="libraryTitle">
+      <header class="library__head">
+        <div>
+          <h2 id="libraryTitle">Banque de memes</h2>
+          <p class="muted">Des videos brutes, sans texte : ajoute le tien puis envoie.</p>
+        </div>
+        <button type="button" class="btn btn--small press" id="libraryClose">Fermer</button>
+      </header>
+      <input type="search" class="library__search" id="librarySearch" placeholder="Rechercher (titre, tag)" autocomplete="off" />
+      <p class="muted library__state" id="libraryState" role="status"></p>
+      <div class="library__grid" id="libraryGrid"></div>
+    </dialog>
 
     <script src="editor.js"></script>
   </body>
