@@ -30,6 +30,8 @@ body {
   --ring: clamp(4px, 0.45vh, 8px);
   /* Ombre large : detache le meme d'un fond clair comme sombre. */
   --lift: 0 2.2vh 5vh rgba(0, 0, 0, 0.45);
+  /* Marge aux bords, recalculee en JS (edgeFor) ; valeur de secours. */
+  --edge: 24px;
 }
 
 .drop {
@@ -38,10 +40,17 @@ body {
   flex-direction: column;
   align-items: center;
   gap: clamp(10px, 1.3vh, 18px);
-  /* Le point d'ancrage est pose en JS via --x/--y ; translate recentre dessus. */
-  left: var(--x);
-  top: var(--y);
-  transform: translate(-50%, -50%);
+  /*
+   * Ancrage (#27) : --fx/--fy (0-1, poses en JS) placent le point d'ancrage
+   * dans l'ecran marges deduites, et translate y accroche le meme point du
+   * meme. Un meme en coin colle donc au coin, sans jamais deborder.
+   */
+  --tx: calc(var(--fx) * -100%);
+  --ty: calc(var(--fy) * -100%);
+  left: calc(var(--edge) + var(--fx) * (100% - 2 * var(--edge)));
+  top: calc(var(--edge) + var(--fy) * (100% - 2 * var(--edge)));
+  transform: translate(var(--tx), var(--ty));
+  transform-origin: calc(var(--fx) * 100%) calc(var(--fy) * 100%);
   will-change: transform, opacity;
   animation: drop-in 420ms cubic-bezier(0.16, 1.24, 0.4, 1) both;
 }
@@ -57,7 +66,7 @@ body {
  */
 .drop__media {
   display: block;
-  max-width: 92vw;
+  max-width: calc(100vw - 2 * var(--edge));
   height: var(--h);
   width: auto;
   object-fit: contain;
@@ -186,22 +195,22 @@ body {
 @keyframes drop-in {
   from {
     opacity: 0;
-    transform: translate(-50%, calc(-50% - 90px)) scale(0.82) rotate(-3deg);
+    transform: translate(var(--tx), calc(var(--ty) - 90px)) scale(0.82) rotate(-3deg);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+    transform: translate(var(--tx), var(--ty)) scale(1) rotate(0deg);
   }
 }
 
 @keyframes drop-out {
   from {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(var(--tx), var(--ty)) scale(1);
   }
   to {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 50px)) scale(0.9);
+    transform: translate(var(--tx), calc(var(--ty) + 50px)) scale(0.9);
   }
 }
 
@@ -211,7 +220,10 @@ body {
   left: 50%;
   top: 50%;
   min-width: 36vh;
-  transform: translate(-50%, -50%);
+  /* Lu par les keyframes drop-in. */
+  --tx: -50%;
+  --ty: -50%;
+  transform: translate(var(--tx), var(--ty));
   padding: 4vh 6vh 4.6vh;
   border-radius: 5vh;
   background: var(--bg);

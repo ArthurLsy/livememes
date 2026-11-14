@@ -1,6 +1,7 @@
-import type { MemeDrop, MemePosition } from '@livememes/shared';
+import type { MemeDrop } from '@livememes/shared';
 import { initialOf } from './avatar.ts';
 import { nudge } from './close.ts';
+import { anchorFor, edgeFor, fitHeight } from './placement.ts';
 import { DropQueue, playsOnce, type View } from './queue.ts';
 
 /** Drop tel que le main l'envoie : `closable` dit s'il faut afficher la croix. */
@@ -19,25 +20,11 @@ declare global {
 
 const stage = document.getElementById('stage') as HTMLDivElement;
 
-/** Coordonnees du centre du meme, en pourcentage de l'ecran. */
-function anchorFor(position: MemePosition): { x: number; y: number } {
-  switch (position) {
-    case 'top-left':
-      return { x: 22, y: 24 };
-    case 'top-right':
-      return { x: 78, y: 24 };
-    case 'bottom-left':
-      return { x: 22, y: 76 };
-    case 'bottom-right':
-      return { x: 78, y: 76 };
-    case 'random':
-      // Marge interieure : le meme ne doit jamais deborder de l'ecran.
-      return { x: 25 + Math.random() * 50, y: 25 + Math.random() * 50 };
-    case 'center':
-    default:
-      return { x: 50, y: 50 };
-  }
+/** Marge aux bords de l'ecran, lue par overlay.css. */
+function applyEdge(): void {
+  document.documentElement.style.setProperty('--edge', `${edgeFor(window.innerHeight)}px`);
 }
+applyEdge();
 
 /**
  * `onEnd` est appele quand une video jouee jusqu'au bout se termine ou ne peut
@@ -105,7 +92,10 @@ function reportZones(): void {
   window.overlay.setCloseZones(zones);
 }
 
-window.addEventListener('resize', reportZones);
+window.addEventListener('resize', () => {
+  applyEdge();
+  reportZones();
+});
 
 /** Recale la croix dans l'ecran quand le meme deborde (grand meme en coin). */
 function keepInside(button: HTMLButtonElement): void {
@@ -139,8 +129,8 @@ function mount(drop: OverlayDrop, end: () => void): View {
   const anchor = anchorFor(drop.position);
   const element = document.createElement('div');
   element.className = 'drop';
-  element.style.setProperty('--x', `${anchor.x}%`);
-  element.style.setProperty('--y', `${anchor.y}%`);
+  element.style.setProperty('--fx', String(anchor.fx));
+  element.style.setProperty('--fy', String(anchor.fy));
   element.style.setProperty('--h', `${Math.round(drop.scale * 100)}vh`);
 
   const frame = document.createElement('div');
@@ -188,6 +178,11 @@ function mount(drop: OverlayDrop, end: () => void): View {
   element.append(author);
 
   stage.append(element);
+  // Le media a deja sa hauteur demandee (avant meme son chargement) : le reste
+  // du meme est mesurable, et le tout doit tenir dans l'ecran.
+  const extra = element.offsetHeight - frame.offsetHeight;
+  const height = fitHeight({ scale: drop.scale, viewportHeight: window.innerHeight, extra });
+  element.style.setProperty('--h', `${height}px`);
   // Zone approximative pendant l'animation d'entree, recalee a `animationend`.
   if (close) reportZones();
 
