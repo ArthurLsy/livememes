@@ -5,14 +5,13 @@ depuis l'app, il s'affiche en plein ecran chez tous les membres de ton salon voc
 
 ## Nouveau dans cette version
 
-- **Qui est dans le vocal** : une colonne d'avatars sur le cote de l'ecran
-  montre les membres de ton salon vocal. Pastille verte : il voit les memes ;
-  grise : il n'a pas l'app ouverte ; orange barree : il est en sourdine. Cote,
-  taille et ecran se reglent dans l'app, et elle se masque quand tu es seul.
-- **Banque de memes** : dans l'editeur, "Banque de memes" propose des videos
-  brutes, sans texte. Pioches-en une, ajoute ta phrase et envoie.
-- **Memes dans les coins** : un grand meme en haut a gauche (ou dans un autre
-  coin) n'est plus coupe a moitie, il se cale dans le coin.
+- **Partage tes videos dans la banque** : apres un enregistrement ou un envoi
+  depuis l'editeur, l'app te propose d'ajouter ta video a la banque de memes
+  (ou bouton "Ajouter a la banque"). Seule la video coupee part, sans ton
+  texte : tout le monde pourra y mettre sa phrase. Rien d'obligatoire.
+
+Deja dans la 0.4.0 : la colonne "qui est dans le vocal", la banque de memes
+dans l'editeur et les memes qui se calent dans les coins.
 
 Depuis la 0.1.0, l'installeur Windows et l'AppImage se mettent a jour tout
 seuls : redemarre l'app quand elle le propose.
