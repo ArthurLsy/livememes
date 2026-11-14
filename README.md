@@ -232,6 +232,34 @@ L'export passe par un ffmpeg embarque dans l'app. Une video sort en mp4 (H.264),
 avec un debit calcule pour rester sous `MEDIA_MAX_BYTES` (25 Mo). Un GIF reste un
 GIF, une photo sort en png ou en jpg.
 
+### Banque de memes
+
+L'editeur propose une banque de videos brutes, **sans texte incruste** : on en
+pioche une ("Banque de memes" ou "Piocher dans la banque"), on ajoute son texte
+puis on l'envoie comme n'importe quel meme. La banque vit sur le serveur, c'est
+nous qui l'alimentons : ajouter une video ne demande pas de nouvelle version de
+l'app.
+
+Pour ajouter une video, depose le fichier (mp4, webm ou mov) dans
+`data/library/` (dans le volume `/app/data` en Docker, ou `LIBRARY_DIR`), puis
+decris-le dans `data/library/library.json` :
+
+```json
+{
+  "videos": [
+    { "id": "chat-surpris", "title": "Chat surpris", "tags": ["chat", "reaction"], "file": "chat-surpris.mp4" }
+  ]
+}
+```
+
+- `id` : minuscules, chiffres et tirets, unique ; il sert d'URL (`/library/<id>`).
+- Le catalogue est relu des qu'il change, sans redemarrage. Une entree invalide
+  (fichier absent, format non supporte, chemin hors du dossier) est ignoree et
+  signalee dans les logs `[banque]`.
+- Uniquement des videos brutes : pas de phrase ni de sous-titre dans l'image.
+  Garde des clips courts (l'editeur coupe a 30 s) et dont on a le droit
+  d'usage.
+
 ### Restreindre a un role
 
 `DROP_ROLE_ID` limite les memes aux porteurs d'un role, **a l'envoi comme a la

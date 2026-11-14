@@ -3,6 +3,7 @@ import {
   MEME_POSITIONS,
   MEME_SIZES,
   type DropUploadResponse,
+  type LibraryResponse,
   type MemePosition,
   type MemeSize,
   type PairRequest,
@@ -10,6 +11,7 @@ import {
 } from '@livememes/shared';
 import { findDeviceByToken, redeemPairingCode } from '../store/devices.ts';
 import * as media from '../media/cache.ts';
+import * as library from '../library/catalog.ts';
 import { config } from '../config.ts';
 import {
   cooldownRemaining,
@@ -206,6 +208,42 @@ export function createApp(options: AppOptions = {}): express.Express {
       screens: report.screens,
     };
     res.json(payload);
+  });
+
+  /** Banque de memes video (#28) : le catalogue, pour l'editeur du client. */
+  app.get('/api/library', (req, res) => {
+    if (!findDeviceByToken(bearer(req.headers.authorization))) {
+      res.status(401).json({ error: "Cet appareil n'est plus lie. Refais /livememes link dans Discord." });
+      return;
+    }
+    const payload: LibraryResponse = {
+      videos: library.list(config.library.dir).map((entry) => ({
+        id: entry.id,
+        title: entry.title,
+        tags: entry.tags,
+        url: `${config.http.publicUrl}/library/${entry.id}`,
+        contentType: entry.contentType,
+        bytes: entry.bytes,
+      })),
+    };
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(payload);
+  });
+
+  /**
+   * Fichiers de la banque. Publics comme /media : l'editeur les lit en apercu
+   * (requetes Range comprises) puis les telecharge pour les retravailler.
+   */
+  app.get('/library/:id', (req, res) => {
+    const entry = library.find(config.library.dir, req.params.id);
+    if (!entry) {
+      res.status(404).end();
+      return;
+    }
+    res.type(entry.contentType);
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.sendFile(entry.file);
   });
 
   /** Sert les medias mis en cache. Les overlays ne tapent que cette route. */

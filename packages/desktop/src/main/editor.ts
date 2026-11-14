@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dialog, ipcMain, shell } from 'electron';
-import type { DropUploadResponse } from '@livememes/shared';
+import type { DropUploadResponse, LibraryResponse, LibraryVideo } from '@livememes/shared';
 import { MAX_IMAGE_SECONDS, SEND_POSITIONS, SEND_SIZES, type SendOptions } from '../renderer/editor-model.ts';
 import {
   gifArgs,
@@ -91,7 +91,7 @@ function humanBytes(bytes: number): string {
 /* Ouverture                                                                  */
 /* -------------------------------------------------------------------------- */
 
-async function openSource(file: string): Promise<Result<{ source: OpenedSource }>> {
+async function openSource(file: string, displayName?: string): Promise<Result<{ source: OpenedSource }>> {
   const type = SOURCES[path.extname(file).toLowerCase()];
   if (!type) return { ok: false, error: 'Format non supporte. Ouvre une video (mp4, mov, webm), un GIF ou une photo.' };
 
@@ -109,7 +109,7 @@ async function openSource(file: string): Promise<Result<{ source: OpenedSource }
     bytes = await fsp.readFile(file);
   }
 
-  source = { file, name: path.basename(file), ...type };
+  source = { file, name: displayName ?? path.basename(file), ...type };
   lastRender = null;
   return {
     ok: true,
@@ -121,6 +121,74 @@ async function openSource(file: string): Promise<Result<{ source: OpenedSource }
       bytes,
     },
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Banque de memes (#28)                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Une video de la banque est retravaillee en clip de 30 s : au-dela, c'est une erreur de catalogue. */
+const MAX_LIBRARY_BYTES = 200 * 1024 * 1024;
+
+/** Dernier catalogue recu : l'ouverture ne telecharge que ce que le serveur a liste. */
+let libraryVideos = new Map<string, LibraryVideo>();
+
+async function fetchLibrary(): Promise<Result<{ videos: LibraryVideo[] }>> {
+  const { token } = store.get();
+  if (!token) return { ok: false, error: "Lie d'abord l'app a ton compte Discord (fenetre de reglages)." };
+  const { http } = store.endpoints(store.SERVER_URL);
+
+  let response: Response;
+  try {
+    response = await fetch(`${http}/api/library`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return { ok: false, error: 'Serveur injoignable. Verifie ta connexion internet et reessaie.' };
+  }
+  if (response.status === 404) return { ok: false, error: "Le serveur ne propose pas encore de banque de memes." };
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: payload.error ?? `Banque indisponible (HTTP ${response.status}).` };
+  }
+
+  const body = (await response.json().catch(() => null)) as LibraryResponse | null;
+  const videos = (Array.isArray(body?.videos) ? body.videos : []).filter(
+    (video): video is LibraryVideo =>
+      typeof video?.id === 'string' &&
+      /^[a-z0-9-]{1,64}$/.test(video.id) &&
+      typeof video.title === 'string' &&
+      Array.isArray(video.tags) &&
+      typeof video.url === 'string' &&
+      /^https?:\/\//.test(video.url),
+  );
+  libraryVideos = new Map(videos.map((video) => [video.id, video]));
+  return { ok: true, videos };
+}
+
+/** Telecharge une video de la banque dans le dossier de travail et l'ouvre comme un fichier local. */
+async function openLibraryVideo(id: unknown): Promise<Result<{ source: OpenedSource }>> {
+  const video = typeof id === 'string' ? libraryVideos.get(id) : undefined;
+  if (!video) return { ok: false, error: 'Video introuvable dans la banque. Rouvre la banque et reessaie.' };
+
+  try {
+    const response = await fetch(video.url, { signal: AbortSignal.timeout(120_000) });
+    const type = (response.headers.get('content-type') ?? '').split(';')[0]!.trim();
+    const ext = Object.entries(SOURCES).find(([, meta]) => meta.kind === 'video' && meta.mime === type)?.[0];
+    if (!response.ok || !ext) return { ok: false, error: 'Video de la banque indisponible.' };
+    if (Number(response.headers.get('content-length') ?? 0) > MAX_LIBRARY_BYTES) {
+      return { ok: false, error: 'Video de la banque trop lourde.' };
+    }
+    const data = Buffer.from(await response.arrayBuffer());
+    if (data.length > MAX_LIBRARY_BYTES) return { ok: false, error: 'Video de la banque trop lourde.' };
+
+    const file = path.join(await ensureWorkDir(), `banque-${video.id}${ext}`);
+    await fsp.writeFile(file, data);
+    return await openSource(file, video.title);
+  } catch {
+    return { ok: false, error: 'Telechargement interrompu. Verifie ta connexion et reessaie.' };
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -356,6 +424,10 @@ export function init(): void {
     if (typeof file !== 'string' || !path.isAbsolute(file)) return { ok: false, error: 'Fichier illisible.' };
     return openSource(file);
   });
+
+  handle('editor:library', () => fetchLibrary());
+
+  handle('editor:openLibrary', (id: unknown) => openLibraryVideo(id));
 
   handle('editor:chooseDir', async () => {
     await chooseDir();

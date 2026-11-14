@@ -1,4 +1,5 @@
-import type { DropUploadResponse } from '@livememes/shared';
+import type { DropUploadResponse, LibraryVideo } from '@livememes/shared';
+import { filterLibrary } from './library-model.ts';
 import type { RenderRequest, SourceKind } from '../main/edit-plan.ts';
 import {
   clamp,
@@ -55,6 +56,8 @@ declare global {
       open(): Promise<Result<{ source: OpenedSource }> | null>;
       openFile(file: File): Promise<Result<{ source: OpenedSource }>>;
       chooseDir(): Promise<EditorState>;
+      library(): Promise<Result<{ videos: LibraryVideo[] }>>;
+      openLibrary(id: string): Promise<Result<{ source: OpenedSource }>>;
       save(job: RenderJob): Promise<Result<{ name: string; dir: string }>>;
       send(job: RenderJob, options: SendOptions): Promise<Result<{ report: DropUploadResponse }>>;
       reveal(): Promise<void>;
@@ -153,6 +156,8 @@ function renderButtons(): void {
   sendButton.disabled = !source || busy || !app.linked;
   sendButton.title = app.linked ? '' : "Lie l'app a ton compte Discord pour envoyer";
   $<HTMLElement>('openButton').hidden = !source;
+  $<HTMLButtonElement>('libraryButton').disabled = busy;
+  $<HTMLButtonElement>('libraryPickButton').disabled = busy;
 
   // Le nom du dossier suffit ; le chemin complet reste au survol.
   const dir = $<HTMLElement>('dirName');
@@ -270,6 +275,105 @@ window.addEventListener('drop', async (event) => {
   document.body.classList.remove('dragging');
   const file = event.dataTransfer?.files[0];
   if (file && !busy) await load(await window.editor.openFile(file));
+});
+
+/* -------------------------------------------------------------------------- */
+/* Banque de memes (#28)                                                      */
+/* -------------------------------------------------------------------------- */
+
+const libraryDialog = $<HTMLDialogElement>('libraryDialog');
+const librarySearch = $<HTMLInputElement>('librarySearch');
+const libraryGrid = $<HTMLElement>('libraryGrid');
+const libraryState = $<HTMLElement>('libraryState');
+let libraryVideos: LibraryVideo[] = [];
+
+function libraryItem(video: LibraryVideo): HTMLButtonElement {
+  const item = document.createElement('button');
+  item.type = 'button';
+  item.className = 'library__item press';
+
+  // Apercu muet : une image fixe, lue au survol.
+  const preview = document.createElement('video');
+  preview.muted = true;
+  preview.loop = true;
+  preview.playsInline = true;
+  preview.preload = 'metadata';
+  preview.src = `${video.url}#t=0.5`;
+  item.addEventListener('mouseenter', () => void preview.play().catch(() => {}));
+  item.addEventListener('mouseleave', () => preview.pause());
+
+  const title = document.createElement('span');
+  title.className = 'library__title';
+  title.textContent = video.title;
+  item.append(preview, title);
+  if (video.tags.length > 0) {
+    const tags = document.createElement('span');
+    tags.className = 'library__tags';
+    tags.textContent = video.tags.map((tag) => `#${tag}`).join(' ');
+    item.append(tags);
+  }
+
+  item.addEventListener('click', () => void pickFromLibrary(video));
+  return item;
+}
+
+function renderLibrary(): void {
+  const shown = filterLibrary(libraryVideos, librarySearch.value);
+  libraryGrid.replaceChildren(...shown.map(libraryItem));
+  if (libraryVideos.length === 0) libraryState.textContent = 'La banque est vide pour le moment.';
+  else if (shown.length === 0) libraryState.textContent = 'Aucune video ne correspond.';
+  else libraryState.textContent = '';
+}
+
+async function openLibrary(): Promise<void> {
+  if (busy) return;
+  libraryVideos = [];
+  libraryGrid.replaceChildren();
+  libraryState.textContent = 'Chargement de la banque...';
+  if (!libraryDialog.open) libraryDialog.showModal();
+
+  const result = await window.editor.library();
+  if (!result.ok) {
+    libraryState.textContent = result.error;
+    return;
+  }
+  libraryVideos = result.videos;
+  renderLibrary();
+  librarySearch.focus();
+}
+
+function closeLibrary(): void {
+  // Coupe le chargement des apercus encore en cours.
+  for (const preview of libraryGrid.querySelectorAll('video')) preview.removeAttribute('src');
+  libraryGrid.replaceChildren();
+  if (libraryDialog.open) libraryDialog.close();
+}
+
+async function pickFromLibrary(video: LibraryVideo): Promise<void> {
+  if (busy) return;
+  closeLibrary();
+  busy = true;
+  renderButtons();
+  setStatus(`Telechargement de "${video.title}"...`);
+  setProgress(null);
+  let result: Result<{ source: OpenedSource }>;
+  try {
+    result = await window.editor.openLibrary(video.id);
+  } finally {
+    busy = false;
+    setProgress(false);
+    renderButtons();
+  }
+  await load(result);
+}
+
+$<HTMLButtonElement>('libraryButton').addEventListener('click', () => void openLibrary());
+$<HTMLButtonElement>('libraryPickButton').addEventListener('click', () => void openLibrary());
+$<HTMLButtonElement>('libraryClose').addEventListener('click', closeLibrary);
+librarySearch.addEventListener('input', renderLibrary);
+libraryDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeLibrary();
 });
 
 /* -------------------------------------------------------------------------- */

@@ -47,6 +47,8 @@ contextBridge.exposeInMainWorld('editor', {
   open: () => ipcRenderer.invoke('editor:open'),
   openFile: (file: File) => ipcRenderer.invoke('editor:openPath', webUtils.getPathForFile(file)),
   chooseDir: () => ipcRenderer.invoke('editor:chooseDir'),
+  library: () => ipcRenderer.invoke('editor:library'),
+  openLibrary: (id: string) => ipcRenderer.invoke('editor:openLibrary', id),
   save: (job: unknown) => ipcRenderer.invoke('editor:save', job),
   send: (job: unknown, options: unknown) => ipcRenderer.invoke('editor:send', job, options),
   reveal: () => ipcRenderer.invoke('editor:reveal'),
