@@ -192,3 +192,42 @@ export function sendSummary(report: DropUploadResponse): string {
   if (report.muted > 0) parts.push(`${report.muted} en sourdine.`);
   return parts.join(' ');
 }
+
+/* -------------------------------------------------------------------------- */
+/* Son ajoute (#36, #37)                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Reglages du son ajoute, memes champs que `SoundClip` cote main. */
+export interface SoundSettings {
+  /** Debut du passage garde dans le son, en secondes. */
+  from: number;
+  /** Moment du clip ou le son demarre, en secondes depuis le debut du clip. */
+  at: number;
+  /** Volume du son ajoute : 1 = tel quel. */
+  gain: number;
+}
+
+export const SOUND_GAIN_MAX = 1.5;
+export const DEFAULT_SOUND: SoundSettings = { from: 0, at: 0, gain: 1 };
+
+/**
+ * Partie du clip couverte par le son ajoute, dans le temps de la source (celui
+ * de la timeline). Null si le passage choisi ne tombe pas dans le clip.
+ */
+export function soundRange(trim: Range, sound: SoundSettings, soundDuration: number): Range | null {
+  const start = trim.start + sound.at;
+  const end = Math.min(trim.end, start + Math.max(0, soundDuration - sound.from));
+  return end - start > 0.01 ? { start, end } : null;
+}
+
+/** Position a lire dans le son quand la video est a `time`, null si le son ne joue pas a ce moment-la. */
+export function soundTimeAt(time: number, trim: Range, sound: SoundSettings, soundDuration: number): number | null {
+  const range = soundRange(trim, sound, soundDuration);
+  if (!range || time < range.start || time >= range.end) return null;
+  return sound.from + (time - range.start);
+}
+
+/** Decale le son dans le clip : il demarre au plus tard 0,1 s avant la fin. */
+export function moveSoundStart(at: number, trim: Range): number {
+  return clamp(at, 0, Math.max(0, trim.end - trim.start - 0.1));
+}

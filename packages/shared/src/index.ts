@@ -196,6 +196,40 @@ export interface LibraryAddResponse {
   video: LibraryVideo;
 }
 
+/* -------------------------------------------------------------------------- */
+/* HTTP : banque de sons (#35)                                                */
+/* -------------------------------------------------------------------------- */
+
+/** Son de la banque, a poser sur une image ou une video dans l'editeur. */
+export interface LibrarySound {
+  id: string;
+  title: string;
+  tags: string[];
+  /** URL absolue du fichier, servie par le backend (`/sounds/<id>`). */
+  url: string;
+  contentType: string;
+  bytes: number;
+}
+
+/** `GET /api/sounds`, token de l'appareil dans `Authorization: Bearer`. */
+export interface SoundsResponse {
+  sounds: LibrarySound[];
+}
+
+/**
+ * `POST /api/sounds?title=...&tags=a,b` : ajoute un son a la banque depuis
+ * l'editeur. Corps = le son (AAC en .m4a, ou mp3), type dans `Content-Type`,
+ * token de l'appareil dans `Authorization: Bearer`. Publie tout de suite.
+ */
+export interface SoundAddResponse {
+  sound: LibrarySound;
+}
+
+/** Poids maximal d'un son ajoute a la banque. */
+export const SOUND_MAX_BYTES = 8 * 1024 * 1024;
+/** Duree maximale d'un son ajoute depuis l'editeur, en secondes (celle d'un clip). */
+export const SOUND_MAX_SECONDS = 30;
+
 /** Reponse d'un envoi reussi : de quoi afficher le bilan dans l'editeur. */
 export interface DropUploadResponse {
   channelName: string;

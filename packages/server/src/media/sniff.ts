@@ -43,6 +43,12 @@ const SIGNATURES: Record<string, (head: Uint8Array) => boolean> = {
   'video/quicktime': (head) =>
     ftypBrand(head) !== null || QUICKTIME_ATOMS.some((atom) => ascii(head, 4, atom)),
   'video/webm': (head) => bytes(head, 0, [0x1a, 0x45, 0xdf, 0xa3]),
+  // Banque de sons (#35).
+  'audio/mp4': (head) => ftypBrand(head) !== null,
+  // Tag ID3 en tete, ou directement une trame MPEG (11 bits de synchro a 1).
+  'audio/mpeg': (head) => ascii(head, 0, 'ID3') || (head.length >= 2 && head[0] === 0xff && (head[1]! & 0xe0) === 0xe0),
+  'audio/ogg': (head) => ascii(head, 0, 'OggS'),
+  'audio/wav': (head) => ascii(head, 0, 'RIFF') && ascii(head, 8, 'WAVE'),
 };
 
 /** Vrai si les premiers octets correspondent au type annonce. */

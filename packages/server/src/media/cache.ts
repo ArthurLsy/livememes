@@ -123,17 +123,22 @@ const DISGUISED_MESSAGE = "Le contenu du fichier ne correspond pas a son type an
 /**
  * Ecrit le corps sur disque en coupant des que la taille max est depassee, et
  * verifie la signature des premiers octets contre le type annonce. Le fichier
- * est supprime en cas d'echec. Exporte pour la banque de memes.
+ * est supprime en cas d'echec. Exporte pour les banques de memes et de sons.
  */
-export async function streamToFile(body: Readable, contentType: string, file: string): Promise<number> {
+export async function streamToFile(
+  body: Readable,
+  contentType: string,
+  file: string,
+  maxBytes = config.media.maxBytes,
+): Promise<number> {
   const handle = await fsp.open(file, 'w');
   let written = 0;
   let head: Buffer | null = Buffer.alloc(0); // null une fois la signature validee
   try {
     for await (const chunk of body as AsyncIterable<Buffer>) {
       written += chunk.byteLength;
-      if (written > config.media.maxBytes) {
-        throw new MediaError(`Fichier trop lourd (max ${humanBytes(config.media.maxBytes)}).`);
+      if (written > maxBytes) {
+        throw new MediaError(`Fichier trop lourd (max ${humanBytes(maxBytes)}).`);
       }
       if (head) {
         head = Buffer.concat([head, chunk]);

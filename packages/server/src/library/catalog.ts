@@ -2,11 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 /**
- * Banque de memes video (#28). L'equipe la remplit a la main : les videos dans
- * le dossier `LIBRARY_DIR`, et un catalogue `library.json` qui les decrit :
+ * Banques de medias : la banque de memes video (#28) et la banque de sons
+ * (#35). Elles vivent dans le meme dossier `LIBRARY_DIR`, chacune avec son
+ * catalogue JSON qui decrit ses fichiers :
  *
  * ```json
- * { "videos": [ { "id": "chat-surpris", "title": "Chat surpris", "tags": ["chat", "reaction"], "file": "chat-surpris.mp4" } ] }
+ * library.json : { "videos": [ { "id": "chat-surpris", "title": "Chat surpris", "tags": ["chat"], "file": "chat-surpris.mp4" } ] }
+ * sounds.json  : { "sounds": [ { "id": "vine-boom", "title": "Vine boom", "tags": ["boom"], "file": "vine-boom.m4a" } ] }
  * ```
  *
  * Uniquement des videos brutes, sans phrase incrustee : le texte, c'est
@@ -14,14 +16,37 @@ import path from 'node:path';
  * (avec un log) plutot que de casser toute la banque.
  */
 
-export const MANIFEST = 'library.json';
+/** Ce qui distingue une banque d'une autre : catalogue, cle de la liste, formats. */
+export interface CatalogSpec {
+  manifest: string;
+  /** Cle de la liste dans le catalogue : "videos" ou "sounds". */
+  key: string;
+  /** Formats acceptes, d'apres l'extension du fichier. */
+  types: Record<string, string>;
+  /** Pour les messages : "mp4, webm ou mov". */
+  formats: string;
+  /** Slug de repli d'un titre sans lettre ni chiffre. */
+  fallback: string;
+}
 
-/** Formats acceptes, d'apres l'extension du fichier. */
-const VIDEO_TYPES: Record<string, string> = {
-  '.mp4': 'video/mp4',
-  '.webm': 'video/webm',
-  '.mov': 'video/quicktime',
+export const VIDEOS: CatalogSpec = {
+  manifest: 'library.json',
+  key: 'videos',
+  types: { '.mp4': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime' },
+  formats: 'mp4, webm ou mov',
+  fallback: 'video',
 };
+
+/** Banque de sons (#35). L'editeur y envoie de l'AAC (.m4a) ; l'equipe peut aussi deposer du mp3. */
+export const SOUNDS: CatalogSpec = {
+  manifest: 'sounds.json',
+  key: 'sounds',
+  types: { '.m4a': 'audio/mp4', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.wav': 'audio/wav' },
+  formats: 'm4a, mp3, ogg ou wav',
+  fallback: 'son',
+};
+
+export const MANIFEST = VIDEOS.manifest;
 
 const ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const MAX_TITLE = 80;
@@ -38,10 +63,11 @@ export interface LibraryEntry {
   bytes: number;
 }
 
-let cache: { dir: string; mtimeMs: number; entries: LibraryEntry[] } | null = null;
+/** Catalogues deja lus, par chemin de catalogue. */
+const cache = new Map<string, { mtimeMs: number; entries: LibraryEntry[] }>();
 
 /** Valide une entree du catalogue ; renvoie la raison du refus sinon. */
-export function parseEntry(raw: unknown, dir: string): LibraryEntry | string {
+export function parseEntry(raw: unknown, dir: string, spec: CatalogSpec = VIDEOS): LibraryEntry | string {
   if (typeof raw !== 'object' || raw === null) return 'entree non objet';
   const { id, title, tags, file } = raw as Record<string, unknown>;
 
@@ -57,8 +83,8 @@ export function parseEntry(raw: unknown, dir: string): LibraryEntry | string {
   const resolved = path.resolve(root, file);
   if (!resolved.startsWith(root + path.sep)) return `${id} : fichier hors de la banque`;
 
-  const contentType = VIDEO_TYPES[path.extname(resolved).toLowerCase()];
-  if (!contentType) return `${id} : format non supporte (mp4, webm ou mov)`;
+  const contentType = spec.types[path.extname(resolved).toLowerCase()];
+  if (!contentType) return `${id} : format non supporte (${spec.formats})`;
 
   let stat: fs.Stats;
   try {
@@ -82,25 +108,29 @@ export function parseEntry(raw: unknown, dir: string): LibraryEntry | string {
 }
 
 /** Lit et valide tout le catalogue. Sans catalogue, la banque est simplement vide. */
-export function readCatalog(dir: string, log: (message: string) => void = console.warn): LibraryEntry[] {
+export function readCatalog(
+  dir: string,
+  log: (message: string) => void = console.warn,
+  spec: CatalogSpec = VIDEOS,
+): LibraryEntry[] {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(fs.readFileSync(path.join(dir, MANIFEST), 'utf8'));
+    parsed = JSON.parse(fs.readFileSync(path.join(dir, spec.manifest), 'utf8'));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') log(`[banque] ${MANIFEST} illisible : ${(error as Error).message}`);
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') log(`[banque] ${spec.manifest} illisible : ${(error as Error).message}`);
     return [];
   }
 
-  const videos = (parsed as { videos?: unknown }).videos;
-  if (!Array.isArray(videos)) {
-    log(`[banque] ${MANIFEST} doit contenir { "videos": [...] }`);
+  const items = (parsed as Record<string, unknown>)[spec.key];
+  if (!Array.isArray(items)) {
+    log(`[banque] ${spec.manifest} doit contenir { "${spec.key}": [...] }`);
     return [];
   }
 
   const entries: LibraryEntry[] = [];
   const seen = new Set<string>();
-  for (const raw of videos) {
-    const entry = parseEntry(raw, dir);
+  for (const raw of items) {
+    const entry = parseEntry(raw, dir, spec);
     if (typeof entry === 'string') {
       log(`[banque] entree ignoree : ${entry}`);
       continue;
@@ -115,35 +145,38 @@ export function readCatalog(dir: string, log: (message: string) => void = consol
   return entries;
 }
 
-/** Catalogue courant, relu seulement quand `library.json` a change. */
-export function list(dir: string): LibraryEntry[] {
+/** Catalogue courant, relu seulement quand son fichier JSON a change. */
+export function list(dir: string, spec: CatalogSpec = VIDEOS): LibraryEntry[] {
+  const manifest = path.join(dir, spec.manifest);
   let mtimeMs = -1;
   try {
-    mtimeMs = fs.statSync(path.join(dir, MANIFEST)).mtimeMs;
+    mtimeMs = fs.statSync(manifest).mtimeMs;
   } catch {
     // Pas de catalogue : banque vide.
   }
-  if (!cache || cache.dir !== dir || cache.mtimeMs !== mtimeMs) {
-    cache = { dir, mtimeMs, entries: mtimeMs < 0 ? [] : readCatalog(dir) };
+  let hit = cache.get(manifest);
+  if (!hit || hit.mtimeMs !== mtimeMs) {
+    hit = { mtimeMs, entries: mtimeMs < 0 ? [] : readCatalog(dir, console.warn, spec) };
+    cache.set(manifest, hit);
   }
-  return cache.entries;
+  return hit.entries;
 }
 
-export function find(dir: string, id: string): LibraryEntry | null {
-  return list(dir).find((entry) => entry.id === id) ?? null;
+export function find(dir: string, id: string, spec: CatalogSpec = VIDEOS): LibraryEntry | null {
+  return list(dir, spec).find((entry) => entry.id === id) ?? null;
 }
 
 /* -------------------------------------------------------------------------- */
 /* Ajouts depuis l'editeur                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** Extension du fichier ecrit pour un type video accepte. */
-export function extensionFor(contentType: string): string | null {
-  return Object.entries(VIDEO_TYPES).find(([, type]) => type === contentType)?.[0] ?? null;
+/** Extension du fichier ecrit pour un type accepte par la banque. */
+export function extensionFor(contentType: string, spec: CatalogSpec = VIDEOS): string | null {
+  return Object.entries(spec.types).find(([, type]) => type === contentType)?.[0] ?? null;
 }
 
 /** "Chat surpris !" -> "chat-surpris", borne pour laisser la place au suffixe. */
-export function slugify(title: string): string {
+export function slugify(title: string, fallback = VIDEOS.fallback): string {
   const slug = title
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
@@ -152,13 +185,17 @@ export function slugify(title: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)
     .replace(/-+$/, '');
-  return slug || 'video';
+  return slug || fallback;
 }
 
 /** Titre et tags saisis par l'utilisateur ; renvoie un message d'erreur sinon. */
-export function parseSubmission(rawTitle: unknown, rawTags: unknown): { title: string; tags: string[] } | string {
+export function parseSubmission(
+  rawTitle: unknown,
+  rawTags: unknown,
+  missing = 'Donne un titre a la video.',
+): { title: string; tags: string[] } | string {
   const title = typeof rawTitle === 'string' ? rawTitle.trim().replace(/\s+/g, ' ') : '';
-  if (!title) return 'Donne un titre a la video.';
+  if (!title) return missing;
   if (title.length > MAX_TITLE) return `Titre trop long (${MAX_TITLE} caracteres max).`;
   const tags = typeof rawTags === 'string' ? rawTags.split(',') : [];
   return {
@@ -174,24 +211,28 @@ export function parseSubmission(rawTitle: unknown, rawTags: unknown): { title: s
 let writing: Promise<unknown> = Promise.resolve();
 
 /**
- * Ajoute au catalogue une video deja ecrite dans le dossier de la banque.
+ * Ajoute au catalogue un fichier deja ecrit dans le dossier de la banque.
  * Ecriture atomique (fichier temporaire puis renommage) : un lecteur ne voit
  * jamais un catalogue a moitie ecrit. Les entrees existantes, meme invalides,
  * sont gardees telles quelles.
  */
-export function append(dir: string, entry: { id: string; title: string; tags: string[]; file: string; addedBy: string }): Promise<void> {
+export function append(
+  dir: string,
+  entry: { id: string; title: string; tags: string[]; file: string; addedBy: string },
+  spec: CatalogSpec = VIDEOS,
+): Promise<void> {
   const task = writing.then(async () => {
-    const manifest = path.join(dir, MANIFEST);
-    let data: { videos: unknown[] } & Record<string, unknown> = { videos: [] };
+    const manifest = path.join(dir, spec.manifest);
+    let data: Record<string, unknown> = { [spec.key]: [] };
     try {
       const parsed = JSON.parse(await fs.promises.readFile(manifest, 'utf8')) as Record<string, unknown>;
-      if (!Array.isArray(parsed.videos)) throw new Error(`${MANIFEST} sans liste "videos"`);
-      data = parsed as typeof data;
+      if (!Array.isArray(parsed[spec.key])) throw new Error(`${spec.manifest} sans liste "${spec.key}"`);
+      data = parsed;
     } catch (error) {
       // Un catalogue illisible ne doit pas etre ecrase par un ajout : on refuse.
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
-    data.videos.push({ ...entry, addedAt: new Date().toISOString() });
+    (data[spec.key] as unknown[]).push({ ...entry, addedAt: new Date().toISOString() });
     const temp = `${manifest}.${process.pid}.tmp`;
     await fs.promises.writeFile(temp, `${JSON.stringify(data, null, 2)}\n`);
     await fs.promises.rename(temp, manifest);
@@ -201,9 +242,9 @@ export function append(dir: string, entry: { id: string; title: string; tags: st
 }
 
 /** Id libre : le slug du titre et un suffixe aleatoire court. */
-export function freeId(dir: string, title: string, ext: string, random: () => string): string {
-  const base = slugify(title);
-  const taken = new Set(list(dir).map((entry) => entry.id));
+export function freeId(dir: string, title: string, ext: string, random: () => string, spec: CatalogSpec = VIDEOS): string {
+  const base = slugify(title, spec.fallback);
+  const taken = new Set(list(dir, spec).map((entry) => entry.id));
   for (;;) {
     const id = `${base}-${random()}`;
     if (!taken.has(id) && !fs.existsSync(path.join(dir, `${id}${ext}`))) return id;

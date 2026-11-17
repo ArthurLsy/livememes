@@ -5,12 +5,25 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { dialog, ipcMain, shell } from 'electron';
-import type { DropUploadResponse, LibraryAddResponse, LibraryResponse, LibraryVideo } from '@livememes/shared';
+import {
+  SOUND_MAX_BYTES,
+  SOUND_MAX_SECONDS,
+  type DropUploadResponse,
+  type LibraryAddResponse,
+  type LibraryResponse,
+  type LibrarySound,
+  type LibraryVideo,
+  type SoundAddResponse,
+  type SoundsResponse,
+} from '@livememes/shared';
 import { MAX_IMAGE_SECONDS, SEND_POSITIONS, SEND_SIZES, type SendOptions } from '../renderer/editor-model.ts';
 import {
   gifArgs,
   OUTPUT,
   parseRenderRequest,
+  parseSound,
+  photoSoundArgs,
+  soundArgs,
   tighten,
   UPLOAD_MAX_BYTES,
   videoArgs,
@@ -19,7 +32,7 @@ import {
   type SourceKind,
 } from './edit-plan.ts';
 import * as editorWindow from './editor-window.ts';
-import { RenderError, runFfmpeg } from './ffmpeg.ts';
+import { probeAudio, RenderError, runFfmpeg } from './ffmpeg.ts';
 import * as store from './store.ts';
 
 /** Formats ouverts par l'editeur, d'apres l'extension. */
@@ -35,6 +48,35 @@ const SOURCES: Record<string, { kind: SourceKind; mime: string }> = {
   '.webp': { kind: 'photo', mime: 'image/webp' },
 };
 
+/**
+ * Fichiers acceptes comme son ajoute (#36, #37) : des sons, mais aussi des
+ * videos, dont on reprend la bande son.
+ */
+const SOUND_FILES: Record<string, string> = {
+  '.mp3': 'audio/mpeg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.opus': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm',
+};
+
+/** Extension du fichier ecrit pour un son telecharge depuis la banque. */
+const SOUND_DOWNLOADS: Record<string, string> = {
+  'audio/mpeg': '.mp3',
+  'audio/mp4': '.m4a',
+  'audio/ogg': '.ogg',
+  'audio/wav': '.wav',
+};
+
+/** Un son plus lourd est une erreur de manip (un film entier ?). */
+const MAX_SOUND_INPUT_BYTES = 500 * 1024 * 1024;
+
 /** Une image est transmise au renderer en memoire : au-dela, on refuse. */
 const MAX_IMAGE_INPUT_BYTES = 60 * 1024 * 1024;
 
@@ -44,6 +86,21 @@ interface Source {
   kind: SourceKind;
   mime: string;
   /** Video piochee dans la banque : inutile de proposer de l'y ajouter. */
+  fromLibrary: boolean;
+}
+
+/** Son ajoute, choisi par import ou dans la banque de sons. */
+interface Sound {
+  file: string;
+  name: string;
+  /** Son pioche dans la banque : inutile de proposer de l'y ajouter. */
+  fromLibrary: boolean;
+}
+
+/** Son tel que le renderer le recoit : une URL file:// pour l'apercu. */
+export interface OpenedSound {
+  name: string;
+  url: string;
   fromLibrary: boolean;
 }
 
@@ -68,6 +125,9 @@ export interface RenderJob {
 type Result<T> = ({ ok: true } & T) | { ok: false; error: string };
 
 let source: Source | null = null;
+/** La source ouverte a-t-elle une piste son ? Sonde une fois, au premier rendu qui en a besoin. */
+let sourceAudio: boolean | null = null;
+let sound: Sound | null = null;
 let workDir: string | null = null;
 let lastRender: { key: string; file: string; mime: string; ext: string } | null = null;
 let lastSaved: string | null = null;
@@ -84,6 +144,8 @@ export function cleanup(): void {
   workDir = null;
   lastRender = null;
   source = null;
+  sourceAudio = null;
+  sound = null;
 }
 
 function humanBytes(bytes: number): string {
@@ -113,6 +175,7 @@ async function openSource(file: string, displayName?: string, fromLibrary = fals
   }
 
   source = { file, name: displayName ?? path.basename(file), ...type, fromLibrary };
+  sourceAudio = null;
   lastRender = null;
   return {
     ok: true,
@@ -138,37 +201,14 @@ const MAX_LIBRARY_BYTES = 200 * 1024 * 1024;
 let libraryVideos = new Map<string, LibraryVideo>();
 
 async function fetchLibrary(): Promise<Result<{ videos: LibraryVideo[] }>> {
-  const { token } = store.get();
-  if (!token) return { ok: false, error: "Lie d'abord l'app a ton compte Discord (fenetre de reglages)." };
-  const { http } = store.endpoints(store.SERVER_URL);
-
-  let response: Response;
-  try {
-    response = await fetch(`${http}/api/library`, {
-      headers: { authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
-    return { ok: false, error: 'Serveur injoignable. Verifie ta connexion internet et reessaie.' };
-  }
-  if (response.status === 404) return { ok: false, error: "Le serveur ne propose pas encore de banque de memes." };
-  if (!response.ok) {
-    const payload = (await response.json().catch(() => ({}))) as { error?: string };
-    return { ok: false, error: payload.error ?? `Banque indisponible (HTTP ${response.status}).` };
-  }
-
-  const body = (await response.json().catch(() => null)) as LibraryResponse | null;
-  const videos = (Array.isArray(body?.videos) ? body.videos : []).filter(
-    (video): video is LibraryVideo =>
-      typeof video?.id === 'string' &&
-      /^[a-z0-9-]{1,64}$/.test(video.id) &&
-      typeof video.title === 'string' &&
-      Array.isArray(video.tags) &&
-      typeof video.url === 'string' &&
-      /^https?:\/\//.test(video.url),
+  const result = await fetchCatalog<LibraryVideo>(
+    'library',
+    (body) => (body as LibraryResponse | null)?.videos,
+    'Le serveur ne propose pas encore de banque de memes.',
   );
-  libraryVideos = new Map(videos.map((video) => [video.id, video]));
-  return { ok: true, videos };
+  if (!result.ok) return result;
+  libraryVideos = new Map(result.items.map((video) => [video.id, video]));
+  return { ok: true, videos: result.items };
 }
 
 /** Telecharge une video de la banque dans le dossier de travail et l'ouvre comme un fichier local. */
@@ -196,6 +236,151 @@ async function openLibraryVideo(id: unknown): Promise<Result<{ source: OpenedSou
 }
 
 /* -------------------------------------------------------------------------- */
+/* Son ajoute et banque de sons (#35, #36, #37)                               */
+/* -------------------------------------------------------------------------- */
+
+async function openSound(file: string, displayName?: string, fromLibrary = false): Promise<Result<{ sound: OpenedSound }>> {
+  if (!SOUND_FILES[path.extname(file).toLowerCase()]) {
+    return { ok: false, error: 'Format non supporte. Ouvre un son (mp3, m4a, wav, ogg) ou une video.' };
+  }
+  let stat: fs.Stats;
+  try {
+    stat = await fsp.stat(file);
+  } catch {
+    return { ok: false, error: 'Fichier introuvable.' };
+  }
+  if (!stat.isFile()) return { ok: false, error: 'Ce n est pas un fichier.' };
+  if (stat.size > MAX_SOUND_INPUT_BYTES) return { ok: false, error: `Fichier trop lourd (${humanBytes(stat.size)}).` };
+  if (!(await probeAudio(file))) return { ok: false, error: "Ce fichier n'a pas de son." };
+
+  sound = { file, name: displayName ?? path.basename(file), fromLibrary };
+  lastRender = null;
+  return { ok: true, sound: { name: sound.name, url: pathToFileURL(file).href, fromLibrary } };
+}
+
+/** Catalogue d'une banque du serveur, filtre sur la forme attendue. */
+async function fetchCatalog<T extends LibraryVideo | LibrarySound>(
+  route: string,
+  pick: (body: unknown) => unknown,
+  missing: string,
+): Promise<Result<{ items: T[] }>> {
+  const { token } = store.get();
+  if (!token) return { ok: false, error: "Lie d'abord l'app a ton compte Discord (fenetre de reglages)." };
+  const { http } = store.endpoints(store.SERVER_URL);
+
+  let response: Response;
+  try {
+    response = await fetch(`${http}/api/${route}`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    return { ok: false, error: 'Serveur injoignable. Verifie ta connexion internet et reessaie.' };
+  }
+  if (response.status === 404) return { ok: false, error: missing };
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: payload.error ?? `Banque indisponible (HTTP ${response.status}).` };
+  }
+
+  const list = pick(await response.json().catch(() => null));
+  const items = (Array.isArray(list) ? list : []).filter(
+    (item): item is T =>
+      typeof item?.id === 'string' &&
+      /^[a-z0-9-]{1,64}$/.test(item.id) &&
+      typeof item.title === 'string' &&
+      Array.isArray(item.tags) &&
+      typeof item.url === 'string' &&
+      /^https?:\/\//.test(item.url),
+  );
+  return { ok: true, items };
+}
+
+let librarySounds = new Map<string, LibrarySound>();
+
+async function fetchSounds(): Promise<Result<{ sounds: LibrarySound[] }>> {
+  const result = await fetchCatalog<LibrarySound>(
+    'sounds',
+    (body) => (body as SoundsResponse | null)?.sounds,
+    'Le serveur ne propose pas encore de banque de sons.',
+  );
+  if (!result.ok) return result;
+  librarySounds = new Map(result.items.map((item) => [item.id, item]));
+  return { ok: true, sounds: result.items };
+}
+
+/** Plafond d'un son telecharge depuis la banque : le serveur en accepte 8 Mo, l'equipe peut en deposer de plus gros. */
+const MAX_LIBRARY_SOUND_BYTES = 50 * 1024 * 1024;
+
+async function openLibrarySound(id: unknown): Promise<Result<{ sound: OpenedSound }>> {
+  const item = typeof id === 'string' ? librarySounds.get(id) : undefined;
+  if (!item) return { ok: false, error: 'Son introuvable dans la banque. Rouvre la banque et reessaie.' };
+
+  try {
+    const response = await fetch(item.url, { signal: AbortSignal.timeout(60_000) });
+    const type = (response.headers.get('content-type') ?? '').split(';')[0]!.trim();
+    const ext = SOUND_DOWNLOADS[type];
+    if (!response.ok || !ext) return { ok: false, error: 'Son de la banque indisponible.' };
+    if (Number(response.headers.get('content-length') ?? 0) > MAX_LIBRARY_SOUND_BYTES) {
+      return { ok: false, error: 'Son de la banque trop lourd.' };
+    }
+    const data = Buffer.from(await response.arrayBuffer());
+    if (data.length > MAX_LIBRARY_SOUND_BYTES) return { ok: false, error: 'Son de la banque trop lourd.' };
+
+    const file = path.join(await ensureWorkDir(), `son-${item.id}${ext}`);
+    await fsp.writeFile(file, data);
+    return await openSound(file, item.title, true);
+  } catch {
+    return { ok: false, error: 'Telechargement interrompu. Verifie ta connexion et reessaie.' };
+  }
+}
+
+/**
+ * Ajoute le son a la banque : le passage choisi (a partir de `from`), 30 s au
+ * plus, converti en AAC. Publie tout de suite pour tout le monde.
+ */
+async function addSoundToLibrary(rawMeta: unknown, rawFrom: unknown): Promise<Result<{ sound: LibrarySound }>> {
+  const { token } = store.get();
+  if (!token) return { ok: false, error: "Lie d'abord l'app a ton compte Discord (fenetre de reglages)." };
+  if (!sound) return { ok: false, error: "Choisis d'abord un son." };
+  if (sound.fromLibrary) return { ok: false, error: 'Ce son vient deja de la banque.' };
+
+  const meta = (typeof rawMeta === 'object' && rawMeta !== null ? rawMeta : {}) as Record<string, unknown>;
+  const title = typeof meta.title === 'string' ? meta.title.trim() : '';
+  const tags = typeof meta.tags === 'string' ? meta.tags : '';
+  if (!title) return { ok: false, error: 'Donne un titre au son.' };
+  const clip = parseSound({ from: rawFrom, at: 0, gain: 1 });
+  if (!clip) return { ok: false, error: 'Passage du son invalide.' };
+
+  const file = path.join(await ensureWorkDir(), `banque-son-${Date.now()}.m4a`);
+  await runFfmpeg(soundArgs(clip.from, SOUND_MAX_SECONDS, sound.file, file), SOUND_MAX_SECONDS, progress);
+  const body = await fsp.readFile(file);
+  await fsp.rm(file, { force: true });
+  if (body.length === 0) return { ok: false, error: 'Ce passage ne contient pas de son.' };
+  if (body.length > SOUND_MAX_BYTES) return { ok: false, error: `Son trop lourd (${humanBytes(body.length)}).` };
+
+  const { http } = store.endpoints(store.SERVER_URL);
+  editorWindow.push('editor:progress', null);
+  let response: Response;
+  try {
+    response = await fetch(`${http}/api/sounds?${new URLSearchParams({ title, tags })}`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${token}`, 'content-type': 'audio/mp4' },
+      body,
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch {
+    return { ok: false, error: 'Serveur injoignable. Verifie ta connexion internet et reessaie.' };
+  }
+  if (response.status === 404) return { ok: false, error: "Le serveur ne permet pas encore d'ajouter des sons." };
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    return { ok: false, error: payload.error ?? `Ajout refuse (HTTP ${response.status}).` };
+  }
+  return { ok: true, sound: ((await response.json()) as SoundAddResponse).sound };
+}
+
+/* -------------------------------------------------------------------------- */
 /* Rendu                                                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -205,6 +390,7 @@ const startsWith = (data: Uint8Array, magic: number[]) => magic.every((value, i)
 
 function jobKey(request: RenderRequest, job: RenderJob): string {
   const hash = createHash('sha256').update(source?.file ?? '').update(JSON.stringify(request));
+  if ('sound' in request && request.sound) hash.update(sound?.file ?? '');
   if (job.overlay) hash.update(job.overlay);
   if (job.photo) hash.update(job.photo);
   return hash.digest('hex');
@@ -221,6 +407,8 @@ async function render(job: RenderJob): Promise<{ file: string; mime: string; ext
   if (!source) throw new RenderError("Ouvre d'abord une video ou une photo.");
   const request = parseRenderRequest(job.request, source.kind);
   if (!request) throw new RenderError('Montage invalide.');
+
+  if ('sound' in request && request.sound && !sound) throw new RenderError('Son introuvable : rechoisis-le.');
 
   const key = jobKey(request, job);
   if (lastRender?.key === key && fs.existsSync(lastRender.file)) return lastRender;
@@ -265,14 +453,36 @@ async function render(job: RenderJob): Promise<{ file: string; mime: string; ext
     case 'video': {
       const file = path.join(dir, `${id}.mp4`);
       const seconds = request.trim.end - request.trim.start;
-      let budget = videoBudget(seconds, UPLOAD_MAX_BYTES, request.muted);
-      await runFfmpeg(videoArgs(request, { source: source.file, overlay, output: file }, budget), seconds, progress);
+      // Mixer le son ajoute a celui d'origine suppose que la source en a un.
+      if (request.sound && !request.muted) sourceAudio ??= await probeAudio(source.file);
+      const paths = { source: source.file, overlay, output: file, sound: request.sound ? sound!.file : null };
+      let budget = videoBudget(seconds, UPLOAD_MAX_BYTES, request.muted && !request.sound);
+      await runFfmpeg(videoArgs(request, paths, budget, sourceAudio ?? true), seconds, progress);
       // L'encodeur peut depasser un peu sa cible : une seconde passe, plus serree.
       if ((await sizeOf(file)) > UPLOAD_MAX_BYTES) {
         budget = tighten(budget);
-        await runFfmpeg(videoArgs(request, { source: source.file, overlay, output: file }, budget), seconds, progress);
+        await runFfmpeg(videoArgs(request, paths, budget, sourceAudio ?? true), seconds, progress);
       }
       result = { file, ...OUTPUT.video! };
+      break;
+    }
+
+    case 'photo-sound': {
+      // Photo composee par le renderer, puis image fixe + son en video (#36).
+      if (!job.photo) throw new RenderError('Photo manquante.');
+      const ok = request.mime === 'image/png' ? startsWith(job.photo, PNG) : startsWith(job.photo, JPEG);
+      if (!ok) throw new RenderError('Photo invalide.');
+      const still = path.join(dir, `${id}-photo.${request.mime === 'image/png' ? 'png' : 'jpg'}`);
+      await fsp.writeFile(still, job.photo);
+      const file = path.join(dir, `${id}.mp4`);
+      const paths = { source: still, overlay: null, output: file, sound: sound!.file };
+      let budget = videoBudget(request.seconds, UPLOAD_MAX_BYTES, false);
+      await runFfmpeg(photoSoundArgs(request, paths, budget), request.seconds, progress);
+      if ((await sizeOf(file)) > UPLOAD_MAX_BYTES) {
+        budget = tighten(budget);
+        await runFfmpeg(photoSoundArgs(request, paths, budget), request.seconds, progress);
+      }
+      result = { file, ...OUTPUT['photo-sound']! };
       break;
     }
   }
@@ -480,6 +690,29 @@ export function init(): void {
   handle('editor:openLibrary', (id: unknown) => openLibraryVideo(id));
 
   handle('editor:addToLibrary', (job: RenderJob, meta: unknown) => exclusive(() => addToLibrary(job, meta)));
+
+  handle('editor:openSound', async () => {
+    const window = editorWindow.get();
+    const options: Electron.OpenDialogOptions = {
+      title: 'Choisir un son',
+      properties: ['openFile'],
+      filters: [{ name: 'Sons et videos', extensions: Object.keys(SOUND_FILES).map((ext) => ext.slice(1)) }],
+    };
+    const picked = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    return openSound(picked.filePaths[0]);
+  });
+
+  handle('editor:clearSound', () => {
+    sound = null;
+    lastRender = null;
+  });
+
+  handle('editor:sounds', () => fetchSounds());
+
+  handle('editor:openLibrarySound', (id: unknown) => openLibrarySound(id));
+
+  handle('editor:addSoundToLibrary', (meta: unknown, from: unknown) => exclusive(() => addSoundToLibrary(meta, from)));
 
   handle('editor:chooseDir', async () => {
     await chooseDir();
