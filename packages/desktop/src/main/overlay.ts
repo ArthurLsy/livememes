@@ -3,6 +3,7 @@ import { BrowserWindow, ipcMain, screen, type Display } from 'electron';
 import type { MemeDrop, PresenceMember } from '@livememes/shared';
 import { presenceView } from '../renderer/presence-view.ts';
 import { hitsAny, sanitizeZones, type Zone } from './close-zones.ts';
+import { soundDisplay, volumeFor } from './sound-display.ts';
 import * as store from './store.ts';
 
 const windows = new Map<number, BrowserWindow>();
@@ -256,10 +257,16 @@ export function show(drop: MemeDrop): void {
     closable: settings.closeButton && CLOSE_SUPPORTED,
   };
 
-  each((window) => {
+  // Une seule fenetre joue le son (#38) : les autres ecrans affichent le meme
+  // meme en muet, sinon le son serait entendu une fois par ecran.
+  const targets: number[] = [];
+  each((_window, id) => targets.push(id));
+  const soundOn = soundDisplay(targets, screen.getPrimaryDisplay().id);
+
+  each((window, id) => {
     // Un jeu passe en plein ecran peut avoir repris le dessus entre deux drops.
     window.setAlwaysOnTop(true, 'screen-saver', 1);
-    window.webContents.send('overlay:drop', payload);
+    window.webContents.send('overlay:drop', { ...payload, volume: volumeFor(id, soundOn, payload.volume) });
   });
 }
 
