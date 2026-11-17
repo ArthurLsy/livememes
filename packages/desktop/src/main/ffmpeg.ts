@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
-import { progressSeconds } from './edit-plan.ts';
+import { hasAudioStream, progressSeconds } from './edit-plan.ts';
 
 const OS: Record<string, string> = { win32: 'win', darwin: 'mac', linux: 'linux' };
 
@@ -71,5 +71,25 @@ export function runFfmpeg(
       console.error(`[editeur] ffmpeg a echoue (code ${code}) :\n${tail}`);
       reject(new RenderError("L'export a echoue. Ce format n'est peut-etre pas supporte."));
     });
+  });
+}
+
+/**
+ * Vrai si le fichier a une piste audio. `ffmpeg -i` sans sortie decrit ses
+ * pistes puis echoue : seul son journal compte. False si ffmpeg est absent.
+ */
+export function probeAudio(file: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const child = spawn(ffmpegPath(), ['-hide_banner', '-nostdin', '-i', file], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      windowsHide: true,
+    });
+    let log = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      log = (log + chunk).slice(0, 64_000);
+    });
+    child.on('error', () => resolve(false));
+    child.on('close', () => resolve(hasAudioStream(log)));
   });
 }

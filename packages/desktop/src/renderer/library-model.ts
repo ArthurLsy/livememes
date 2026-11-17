@@ -13,7 +13,7 @@ export function normalize(value: string): string {
  * Videos dont le titre ou les tags contiennent tous les mots de la recherche,
  * dans l'ordre du catalogue. Recherche vide : tout le catalogue.
  */
-export function filterLibrary(videos: readonly LibraryVideo[], query: string): LibraryVideo[] {
+export function filterLibrary<T extends Pick<LibraryVideo, 'title' | 'tags'>>(videos: readonly T[], query: string): T[] {
   const words = normalize(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [...videos];
   return videos.filter((video) => {

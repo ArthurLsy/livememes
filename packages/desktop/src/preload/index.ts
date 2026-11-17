@@ -50,6 +50,12 @@ contextBridge.exposeInMainWorld('editor', {
   library: () => ipcRenderer.invoke('editor:library'),
   openLibrary: (id: string) => ipcRenderer.invoke('editor:openLibrary', id),
   addToLibrary: (job: unknown, meta: unknown) => ipcRenderer.invoke('editor:addToLibrary', job, meta),
+  // Son ajoute et banque de sons (#35, #36, #37).
+  openSound: () => ipcRenderer.invoke('editor:openSound'),
+  clearSound: () => ipcRenderer.invoke('editor:clearSound'),
+  sounds: () => ipcRenderer.invoke('editor:sounds'),
+  openLibrarySound: (id: string) => ipcRenderer.invoke('editor:openLibrarySound', id),
+  addSoundToLibrary: (meta: unknown, from: unknown) => ipcRenderer.invoke('editor:addSoundToLibrary', meta, from),
   save: (job: unknown) => ipcRenderer.invoke('editor:save', job),
   send: (job: unknown, options: unknown) => ipcRenderer.invoke('editor:send', job, options),
   reveal: () => ipcRenderer.invoke('editor:reveal'),

@@ -1,14 +1,16 @@
-import type { DropUploadResponse, LibraryVideo } from '@livememes/shared';
+import type { DropUploadResponse, LibrarySound, LibraryVideo } from '@livememes/shared';
 import { filterLibrary, titleFromName } from './library-model.ts';
 import type { RenderRequest, SourceKind } from '../main/edit-plan.ts';
 import {
   clamp,
   DEFAULT_SEND,
+  DEFAULT_SOUND,
   fitTextRange,
   formatTime,
   initialTrim,
   MAX_CLIP_SECONDS,
   MAX_IMAGE_SECONDS,
+  moveSoundStart,
   moveTextEdge,
   moveTrimEnd,
   moveTrimStart,
@@ -16,12 +18,16 @@ import {
   SEND_SIZES,
   sendSummary,
   shiftTextRange,
+  SOUND_GAIN_MAX,
+  soundRange,
+  soundTimeAt,
   TEXT_COLORS,
   TEXT_FONTS,
   TEXT_SIZE_MAX,
   TEXT_SIZE_MIN,
   type Range,
   type SendOptions,
+  type SoundSettings,
   type TextFont,
   type TextLayer,
 } from './editor-model.ts';
@@ -43,6 +49,13 @@ interface OpenedSource {
   fromLibrary: boolean;
 }
 
+/** Son ajoute tel que le main le renvoie : URL file:// pour l'apercu. */
+interface OpenedSound {
+  name: string;
+  url: string;
+  fromLibrary: boolean;
+}
+
 interface RenderJob {
   request: RenderRequest;
   overlay: Uint8Array | null;
@@ -61,6 +74,11 @@ declare global {
       library(): Promise<Result<{ videos: LibraryVideo[] }>>;
       openLibrary(id: string): Promise<Result<{ source: OpenedSource }>>;
       addToLibrary(job: RenderJob, meta: { title: string; tags: string }): Promise<Result<{ video: LibraryVideo }>>;
+      openSound(): Promise<Result<{ sound: OpenedSound }> | null>;
+      clearSound(): Promise<void>;
+      sounds(): Promise<Result<{ sounds: LibrarySound[] }>>;
+      openLibrarySound(id: string): Promise<Result<{ sound: OpenedSound }>>;
+      addSoundToLibrary(meta: { title: string; tags: string }, from: number): Promise<Result<{ sound: LibrarySound }>>;
       save(job: RenderJob): Promise<Result<{ name: string; dir: string }>>;
       send(job: RenderJob, options: SendOptions): Promise<Result<{ report: DropUploadResponse }>>;
       reveal(): Promise<void>;
@@ -90,6 +108,8 @@ const playhead = $<HTMLElement>('playhead');
 const textInput = $<HTMLTextAreaElement>('textInput');
 const statusEl = $<HTMLElement>('status');
 const saveButton = $<HTMLButtonElement>('saveButton');
+const soundPlayer = $<HTMLAudioElement>('soundPlayer');
+const soundBar = $<HTMLElement>('soundBar');
 const sendButton = $<HTMLButtonElement>('sendButton');
 
 /* -------------------------------------------------------------------------- */
@@ -112,6 +132,15 @@ let busy = false;
 /** La video ouverte est deja dans la banque : on arrete de proposer de l'y ajouter. */
 let addedToLibrary = false;
 const send: SendOptions = { ...DEFAULT_SEND };
+
+/** Son ajoute (#36, #37), garde quand on change de fichier. */
+interface LoadedSound extends OpenedSound {
+  duration: number;
+}
+let sound: LoadedSound | null = null;
+const soundClip: SoundSettings = { ...DEFAULT_SOUND };
+/** Le son ajoute est deja dans la banque de sons. */
+let soundShared = false;
 
 const text: TextLayer = {
   content: '',
@@ -166,6 +195,8 @@ function renderButtons(): void {
   addButton.hidden = !canOfferLibrary();
   addButton.disabled = busy;
   $<HTMLButtonElement>('libraryPickButton').disabled = busy;
+  for (const id of ['importSound', 'soundLibraryButton', 'clearSound']) $<HTMLButtonElement>(id).disabled = busy;
+  $<HTMLElement>('shareSound').hidden = !canShareSound();
 
   // Le nom du dossier suffit ; le chemin complet reste au survol.
   const dir = $<HTMLElement>('dirName');
@@ -250,9 +281,10 @@ async function load(result: Result<{ source: OpenedSource }> | null): Promise<vo
   frame.hidden = false;
   side.hidden = false;
   timeline.hidden = opened.kind !== 'video';
-  $<HTMLElement>('volumeField').hidden = opened.kind !== 'video';
   $<HTMLElement>('durationField').hidden = opened.kind === 'video';
   $<HTMLElement>('fileName').textContent = opened.name;
+  soundClip.at = moveSoundStart(soundClip.at, trim);
+  renderSoundPanel();
   applyAudio();
 
   if (opened.kind === 'video') video.currentTime = 0;
@@ -383,6 +415,258 @@ librarySearch.addEventListener('input', renderLibrary);
 libraryDialog.addEventListener('cancel', (event) => {
   event.preventDefault();
   closeLibrary();
+});
+
+/* -------------------------------------------------------------------------- */
+/* Son ajoute (#36, #37)                                                      */
+/* -------------------------------------------------------------------------- */
+
+/** Un GIF reste un GIF muet : pas de son ajoute. */
+const soundAllowed = () => source !== null && source.kind !== 'gif';
+const hasSound = () => sound !== null && soundAllowed();
+
+const soundFrom = $<HTMLInputElement>('soundFrom');
+const soundGain = $<HTMLInputElement>('soundGain');
+soundGain.max = String(SOUND_GAIN_MAX * 100);
+
+function renderSoundPanel(): void {
+  $<HTMLElement>('soundPanel').hidden = !soundAllowed();
+  // Le volume d'envoi compte pour une video, ou pour une photo qui a un son.
+  $<HTMLElement>('volumeField').hidden = !(isVideo() || hasSound());
+
+  const name = $<HTMLElement>('soundName');
+  name.textContent = sound ? sound.name : 'Aucun son ajoute';
+  name.title = sound?.name ?? '';
+  name.classList.toggle('sound__name--empty', !sound);
+  $<HTMLElement>('clearSound').hidden = !sound;
+  $<HTMLElement>('soundSettings').hidden = !sound;
+  $<HTMLElement>('listenSound').hidden = !sound || isVideo();
+
+  if (sound) {
+    soundFrom.max = String(Math.max(0, sound.duration - 0.1));
+    soundFrom.value = String(soundClip.from);
+    $<HTMLElement>('soundFromValue').textContent = formatTime(soundClip.from);
+    soundGain.value = String(Math.round(soundClip.gain * 100));
+    $<HTMLElement>('soundGainValue').textContent = `${Math.round(soundClip.gain * 100)} %`;
+    $<HTMLElement>('soundHint').textContent = isVideo()
+      ? muted
+        ? "Le son remplace celui de la video. Remets le son d'origine (bouton Son de la timeline) pour mixer les deux."
+        : "Le son est mixe a celui de la video. Glisse-le dans la piste Ajout pour le caler."
+      : `La photo devient une video de ${send.duration} s avec ce son.`;
+  }
+  renderButtons();
+}
+
+async function loadSound(result: Result<{ sound: OpenedSound }> | null): Promise<void> {
+  if (!result) return;
+  if (!result.ok) {
+    setStatus(result.error, 'error');
+    return;
+  }
+  stopSound();
+  soundPlayer.src = result.sound.url;
+  if (!(await once(soundPlayer, 'loadedmetadata')) || !Number.isFinite(soundPlayer.duration) || soundPlayer.duration <= 0) {
+    soundPlayer.removeAttribute('src');
+    void window.editor.clearSound();
+    setStatus("Apercu impossible : l'app ne sait pas lire ce son. Essaie un mp3.", 'error');
+    return;
+  }
+
+  sound = { ...result.sound, duration: soundPlayer.duration };
+  soundShared = false;
+  Object.assign(soundClip, DEFAULT_SOUND);
+  if (isVideo()) {
+    // Remplacer la bande son (#37) : par defaut, le son ajoute prend la place de l'original.
+    muted = true;
+    applyAudio();
+    setStatus(`"${sound.name}" remplace le son de la video. Remets le son d'origine pour mixer les deux.`, 'ok');
+  } else {
+    setStatus(`"${sound.name}" sera joue avec la photo.`, 'ok');
+  }
+  renderSoundPanel();
+  renderTimeline();
+}
+
+function clearSound(): void {
+  stopSound();
+  sound = null;
+  soundPlayer.removeAttribute('src');
+  soundPlayer.load();
+  void window.editor.clearSound();
+  // Le son d'origine revient : il n'y a plus rien pour le remplacer.
+  if (isVideo() && muted) {
+    muted = false;
+    applyAudio();
+  }
+  renderSoundPanel();
+  renderTimeline();
+}
+
+function stopSound(): void {
+  clearTimeout(listenTimer);
+  if (!soundPlayer.paused) soundPlayer.pause();
+  $<HTMLElement>('listenSound').textContent = 'Ecouter';
+}
+
+/** Cale le lecteur du son ajoute sur la video en cours de lecture. */
+function syncSound(): void {
+  if (!sound || !hasSound() || !isVideo()) return;
+  const at = video.paused ? null : soundTimeAt(video.currentTime, trim, soundClip, sound.duration);
+  if (at === null) {
+    if (!soundPlayer.paused) soundPlayer.pause();
+    return;
+  }
+  if (Math.abs(soundPlayer.currentTime - at) > 0.25) soundPlayer.currentTime = at;
+  if (soundPlayer.paused) void soundPlayer.play().catch(() => {});
+}
+
+/** Photo : ecoute du passage choisi, sur la duree d'affichage. */
+let listenTimer: ReturnType<typeof setTimeout> | undefined;
+$<HTMLButtonElement>('listenSound').addEventListener('click', () => {
+  if (!sound) return;
+  if (!soundPlayer.paused) {
+    stopSound();
+    return;
+  }
+  soundPlayer.currentTime = soundClip.from;
+  void soundPlayer.play().catch(() => {});
+  $<HTMLElement>('listenSound').textContent = 'Stop';
+  listenTimer = setTimeout(stopSound, send.duration * 1000);
+});
+
+soundFrom.addEventListener('input', () => {
+  soundClip.from = Number(soundFrom.value);
+  stopSound();
+  renderSoundPanel();
+  renderTimeline();
+});
+soundGain.addEventListener('input', () => {
+  soundClip.gain = Number(soundGain.value) / 100;
+  applyAudio();
+  renderSoundPanel();
+});
+
+$<HTMLButtonElement>('importSound').addEventListener('click', async () => {
+  if (!busy) await loadSound(await window.editor.openSound());
+});
+$<HTMLButtonElement>('clearSound').addEventListener('click', clearSound);
+
+/* Banque de sons (#35) */
+
+const soundDialog = $<HTMLDialogElement>('soundDialog');
+const soundSearch = $<HTMLInputElement>('soundSearch');
+const soundList = $<HTMLElement>('soundList');
+const soundState = $<HTMLElement>('soundState');
+/** Lecteur des apercus de la banque, un seul a la fois. */
+const soundPreview = new Audio();
+let librarySounds: LibrarySound[] = [];
+
+function stopPreview(): void {
+  soundPreview.pause();
+  for (const button of soundList.querySelectorAll('.sound-item__play')) {
+    button.setAttribute('aria-pressed', 'false');
+    button.textContent = '\u25B6';
+  }
+}
+
+soundPreview.addEventListener('ended', stopPreview);
+
+function soundItem(item: LibrarySound): HTMLElement {
+  const row = document.createElement('div');
+  row.className = 'sound-item';
+
+  const play = document.createElement('button');
+  play.type = 'button';
+  play.className = 'sound-item__play press';
+  play.setAttribute('aria-pressed', 'false');
+  play.setAttribute('aria-label', `Ecouter ${item.title}`);
+  play.textContent = '\u25B6';
+  play.addEventListener('click', () => {
+    const playing = play.getAttribute('aria-pressed') === 'true';
+    stopPreview();
+    if (playing) return;
+    soundPreview.src = item.url;
+    void soundPreview.play().catch(() => {});
+    play.setAttribute('aria-pressed', 'true');
+    play.textContent = '\u25A0';
+  });
+
+  const pick = document.createElement('button');
+  pick.type = 'button';
+  pick.className = 'sound-item__pick press';
+  const title = document.createElement('span');
+  title.className = 'library__title';
+  title.textContent = item.title;
+  pick.append(title);
+  if (item.tags.length > 0) {
+    const tags = document.createElement('span');
+    tags.className = 'library__tags';
+    tags.textContent = item.tags.map((tag) => `#${tag}`).join(' ');
+    pick.append(tags);
+  }
+  pick.addEventListener('click', () => void pickSound(item));
+
+  row.append(play, pick);
+  return row;
+}
+
+function renderSounds(): void {
+  stopPreview();
+  const shown = filterLibrary(librarySounds, soundSearch.value);
+  soundList.replaceChildren(...shown.map(soundItem));
+  if (librarySounds.length === 0) soundState.textContent = 'La banque de sons est vide pour le moment.';
+  else if (shown.length === 0) soundState.textContent = 'Aucun son ne correspond.';
+  else soundState.textContent = '';
+}
+
+async function openSoundLibrary(): Promise<void> {
+  if (busy) return;
+  librarySounds = [];
+  soundList.replaceChildren();
+  soundState.textContent = 'Chargement de la banque de sons...';
+  if (!soundDialog.open) soundDialog.showModal();
+
+  const result = await window.editor.sounds();
+  if (!result.ok) {
+    soundState.textContent = result.error;
+    return;
+  }
+  librarySounds = result.sounds;
+  renderSounds();
+  soundSearch.focus();
+}
+
+function closeSoundLibrary(): void {
+  stopPreview();
+  soundPreview.removeAttribute('src');
+  soundList.replaceChildren();
+  if (soundDialog.open) soundDialog.close();
+}
+
+async function pickSound(item: LibrarySound): Promise<void> {
+  if (busy) return;
+  closeSoundLibrary();
+  busy = true;
+  renderButtons();
+  setStatus(`Telechargement de "${item.title}"...`);
+  setProgress(null);
+  let result: Result<{ sound: OpenedSound }>;
+  try {
+    result = await window.editor.openLibrarySound(item.id);
+  } finally {
+    busy = false;
+    setProgress(false);
+    renderButtons();
+  }
+  await loadSound(result);
+}
+
+$<HTMLButtonElement>('soundLibraryButton').addEventListener('click', () => void openSoundLibrary());
+$<HTMLButtonElement>('soundDialogClose').addEventListener('click', closeSoundLibrary);
+soundSearch.addEventListener('input', renderSounds);
+soundDialog.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeSoundLibrary();
 });
 
 /* -------------------------------------------------------------------------- */
@@ -646,22 +930,25 @@ volume.addEventListener('input', () => {
 duration.addEventListener('input', () => {
   send.duration = Number(duration.value);
   renderSendValues();
+  if (sound) renderSoundPanel();
 });
 
 /** L'apercu joue au volume d'envoi : ce qu'on entend est ce que le salon entendra. */
 function applyAudio(): void {
   video.muted = muted;
   video.volume = send.volume / 100;
+  soundPlayer.volume = clamp((send.volume / 100) * soundClip.gain, 0, 1);
   const button = $<HTMLButtonElement>('muteButton');
   button.setAttribute('aria-pressed', String(muted));
   button.textContent = muted ? 'Muet' : 'Son';
   $<HTMLElement>('audioBar').classList.toggle('audio-bar--muted', muted);
-  $<HTMLElement>('audioLabel').textContent = muted ? 'Son coupe' : "Son d'origine";
+  $<HTMLElement>('audioLabel').textContent = muted ? (hasSound() ? "Son d'origine remplace" : 'Son coupe') : "Son d'origine";
 }
 
 $<HTMLButtonElement>('muteButton').addEventListener('click', () => {
   muted = !muted;
   applyAudio();
+  if (sound) renderSoundPanel();
 });
 
 /* -------------------------------------------------------------------------- */
@@ -706,6 +993,11 @@ function renderTimeline(): void {
   $<HTMLElement>('scrimBefore').style.width = `${xOf(trim.start)}px`;
   $<HTMLElement>('scrimAfter').style.left = `${xOf(trim.end)}px`;
   place($('audioBar'), trim);
+
+  const added = sound && hasSound() ? soundRange(trim, soundClip, sound.duration) : null;
+  soundBar.classList.toggle('sound-bar--empty', !added);
+  place(soundBar, added ?? trim);
+  $<HTMLElement>('soundBarLabel').textContent = sound && hasSound() ? sound.name : 'Pas de son ajoute';
 
   textBar.classList.toggle('text-bar--empty', !hasText());
   place(textBar, hasText() ? text.range : trim);
@@ -783,8 +1075,20 @@ drag(textBar, (time) => {
   seek(text.range.start);
 });
 
+// Barre du son ajoute : glisse le moment ou il demarre dans le clip (#37).
+let soundGrab = 0;
+soundBar.addEventListener('pointerdown', (event) => {
+  soundGrab = timeAt(event.clientX) - (trim.start + soundClip.at);
+});
+drag(soundBar, (time) => {
+  if (!sound) return;
+  soundClip.at = moveSoundStart(time - soundGrab - trim.start, trim);
+  renderTimeline();
+  seek(trim.start + soundClip.at);
+});
+
 // Partout ailleurs sur la timeline : deplace la tete de lecture.
-for (const id of ['ruler', 'videoLane', 'audioLane', 'textLane']) {
+for (const id of ['ruler', 'videoLane', 'audioLane', 'soundLane', 'textLane']) {
   drag($(id), (time) => seek(time));
 }
 
@@ -833,6 +1137,7 @@ function tick(): void {
   if (video.currentTime >= trim.end || video.currentTime < trim.start - 0.1) video.currentTime = trim.start;
   renderPlayhead();
   drawPreview();
+  syncSound();
   frameRequest = requestAnimationFrame(tick);
 }
 
@@ -855,6 +1160,7 @@ video.addEventListener('play', () => {
 video.addEventListener('pause', () => {
   $<HTMLElement>('playButton').classList.remove('playing');
   $<HTMLElement>('playButton').setAttribute('aria-label', 'Lecture');
+  if (isVideo()) stopSound();
   drawPreview();
 });
 video.addEventListener('seeked', () => {
@@ -880,7 +1186,9 @@ window.addEventListener('keydown', (event) => {
 /** Plus grand cote d'une photo exportee : au-dela, l'overlay n'en tire rien. */
 const PHOTO_LONG_SIDE = 2560;
 
-async function composePhoto(loaded: Loaded): Promise<{ mime: 'image/png' | 'image/jpeg'; bytes: Uint8Array }> {
+async function composePhoto(
+  loaded: Loaded,
+): Promise<{ mime: 'image/png' | 'image/jpeg'; bytes: Uint8Array; width: number; height: number }> {
   const scale = Math.min(1, PHOTO_LONG_SIDE / Math.max(loaded.width, loaded.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(loaded.width * scale);
@@ -889,17 +1197,33 @@ async function composePhoto(loaded: Loaded): Promise<{ mime: 'image/png' | 'imag
   ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
   drawText(ctx, text, canvas.width, canvas.height);
 
+  const size = { width: canvas.width, height: canvas.height };
   // Un png ou un webp peut etre transparent : on garde le png tant qu'il passe.
   if (loaded.mime !== 'image/jpeg') {
     const png = await toBytes(canvas, 'image/png');
-    if (png.byteLength <= app.maxBytes) return { mime: 'image/png', bytes: png };
+    if (png.byteLength <= app.maxBytes) return { mime: 'image/png', bytes: png, ...size };
   }
-  return { mime: 'image/jpeg', bytes: await toBytes(canvas, 'image/jpeg', 0.9) };
+  return { mime: 'image/jpeg', bytes: await toBytes(canvas, 'image/jpeg', 0.9), ...size };
 }
 
 async function buildJob(loaded: Loaded): Promise<RenderJob> {
   if (loaded.kind === 'photo') {
     const photo = await composePhoto(loaded);
+    if (hasSound()) {
+      // Photo + son (#36) : le main en fait une video de la duree choisie.
+      return {
+        request: {
+          kind: 'photo-sound',
+          mime: photo.mime,
+          width: photo.width,
+          height: photo.height,
+          seconds: send.duration,
+          sound: { ...soundClip, at: 0 },
+        },
+        overlay: null,
+        photo: photo.bytes,
+      };
+    }
     return { request: { kind: 'photo', mime: photo.mime }, overlay: null, photo: photo.bytes };
   }
 
@@ -915,6 +1239,7 @@ async function buildJob(loaded: Loaded): Promise<RenderJob> {
       trim: { ...trim },
       muted,
       text: overlay ? fitTextRange(text.range, trim) : null,
+      sound: hasSound() ? { ...soundClip } : null,
     },
     overlay,
     photo: null,
@@ -925,10 +1250,12 @@ async function run(action: 'save' | 'send'): Promise<void> {
   if (!source || busy) return;
   const loaded = source;
   pause();
+  stopSound();
   busy = true;
   renderButtons();
-  setStatus(loaded.kind === 'video' ? 'Export de la video...' : 'Preparation...');
-  setProgress(loaded.kind === 'photo' ? null : 0);
+  const encodes = loaded.kind === 'video' || hasSound();
+  setStatus(encodes ? 'Export de la video...' : 'Preparation...');
+  setProgress(loaded.kind === 'photo' && !hasSound() ? null : 0);
   let succeeded = false;
 
   try {
@@ -966,6 +1293,84 @@ const offerDialog = $<HTMLDialogElement>('offerDialog');
 const offerName = $<HTMLInputElement>('offerName');
 const offerTags = $<HTMLInputElement>('offerTags');
 const offerError = $<HTMLElement>('offerError');
+/** Le meme dialogue propose d'ajouter la video a la banque de memes, ou le son a la banque de sons. */
+let offerMode: 'video' | 'sound' = 'video';
+
+const OFFER_TEXTS = {
+  video: {
+    title: 'Ajoute cette video a la banque !',
+    text: 'Tout le monde pourra la piocher dans la banque de memes et y mettre sa propre phrase. Seule la video coupee part, sans ton texte.',
+    placeholder: 'Ex. : Chat surpris',
+  },
+  sound: {
+    title: 'Ajoute ce son a la banque !',
+    text: 'Tout le monde pourra le poser sur ses photos et ses videos. Le son part a partir du debut choisi, 30 s au plus.',
+    placeholder: 'Ex. : Vine boom',
+  },
+};
+
+function showOffer(mode: 'video' | 'sound', name: string): void {
+  if (offerDialog.open) return;
+  if (offerMode !== mode) {
+    offerName.value = '';
+    offerTags.value = '';
+  }
+  offerMode = mode;
+  const texts = OFFER_TEXTS[mode];
+  $<HTMLElement>('offerTitle').textContent = texts.title;
+  $<HTMLElement>('offerText').textContent = texts.text;
+  offerName.placeholder = texts.placeholder;
+  if (!offerName.value) offerName.value = titleFromName(name);
+  offerError.hidden = true;
+  offerDialog.showModal();
+  offerName.select();
+}
+
+/** Un son a soi, pas encore partage, et un appareil lie pour l'envoyer. */
+function canShareSound(): boolean {
+  return sound !== null && hasSound() && !sound.fromLibrary && !soundShared && app.linked;
+}
+
+async function addSoundToLibrary(): Promise<void> {
+  if (!sound || busy) return;
+  const title = offerName.value.trim();
+  if (!title) {
+    offerError.hidden = false;
+    offerError.textContent = 'Donne un titre au son.';
+    offerName.focus();
+    return;
+  }
+
+  offerDialog.close();
+  pause();
+  stopSound();
+  busy = true;
+  renderButtons();
+  setStatus('Preparation du son pour la banque...');
+  setProgress(0);
+  try {
+    const result = await window.editor.addSoundToLibrary({ title, tags: offerTags.value }, soundClip.from);
+    if (result.ok) {
+      soundShared = true;
+      offerName.value = '';
+      offerTags.value = '';
+      setStatus(`Merci ! "${result.sound.title}" est dans la banque de sons, dispo pour tout le monde.`, 'ok');
+    } else {
+      setStatus(result.error, 'error', { label: 'Reessayer', run: () => sound && showOffer('sound', sound.name) });
+    }
+  } catch (error) {
+    console.error(error);
+    setStatus("L'ajout a la banque de sons a echoue. Reessaie.", 'error');
+  } finally {
+    busy = false;
+    setProgress(false);
+    renderButtons();
+  }
+}
+
+$<HTMLButtonElement>('shareSound').addEventListener('click', () => {
+  if (sound && canShareSound()) showOffer('sound', sound.name);
+});
 
 /** Une video a soi, pas encore ajoutee, et un appareil lie pour l'envoyer. */
 function canOfferLibrary(): boolean {
@@ -973,11 +1378,8 @@ function canOfferLibrary(): boolean {
 }
 
 function offerLibrary(): void {
-  if (!source || !canOfferLibrary() || offerDialog.open) return;
-  if (!offerName.value) offerName.value = titleFromName(source.name);
-  offerError.hidden = true;
-  offerDialog.showModal();
-  offerName.select();
+  if (!source || !canOfferLibrary()) return;
+  showOffer('video', source.name);
 }
 
 async function addToLibrary(): Promise<void> {
@@ -999,7 +1401,15 @@ async function addToLibrary(): Promise<void> {
   try {
     // Version brute : coupe et son conserves, texte jamais incruste.
     const job: RenderJob = {
-      request: { kind: 'video', width: source.width, height: source.height, trim: { ...trim }, muted, text: null },
+      request: {
+        kind: 'video',
+        width: source.width,
+        height: source.height,
+        trim: { ...trim },
+        muted,
+        text: null,
+        sound: hasSound() ? { ...soundClip } : null,
+      },
       overlay: null,
       photo: null,
     };
@@ -1024,7 +1434,7 @@ async function addToLibrary(): Promise<void> {
 
 $<HTMLFormElement>('offerForm').addEventListener('submit', (event) => {
   event.preventDefault();
-  void addToLibrary();
+  void (offerMode === 'sound' ? addSoundToLibrary() : addToLibrary());
 });
 $<HTMLButtonElement>('offerLater').addEventListener('click', () => offerDialog.close());
 $<HTMLButtonElement>('addLibraryButton').addEventListener('click', offerLibrary);
@@ -1040,7 +1450,7 @@ window.editor.onProgress((fraction) => {
     return;
   }
   setProgress(fraction);
-  if (isVideo()) setStatus(`Export de la video... ${Math.round(fraction * 100)} %`);
+  if (isVideo() || hasSound()) setStatus(`Export... ${Math.round(fraction * 100)} %`);
 });
 
 $<HTMLButtonElement>('dirButton').addEventListener('click', async () => {
