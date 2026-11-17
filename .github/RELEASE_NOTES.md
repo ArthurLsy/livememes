@@ -5,13 +5,20 @@ depuis l'app, il s'affiche en plein ecran chez tous les membres de ton salon voc
 
 ## Nouveau dans cette version
 
-- **Partage tes videos dans la banque** : apres un enregistrement ou un envoi
-  depuis l'editeur, l'app te propose d'ajouter ta video a la banque de memes
-  (ou bouton "Ajouter a la banque"). Seule la video coupee part, sans ton
-  texte : tout le monde pourra y mettre sa phrase. Rien d'obligatoire.
+- **Banque de sons** : dans l'editeur, pioche un son dans la banque (ecoute-le
+  avant de choisir) ou importe le tien (mp3, m4a, wav, ogg, ou la bande son
+  d'une video). Tu peux partager ton son dans la banque pour tout le monde.
+- **Un son sur une photo** : ajoute un son a une image, elle part en plein
+  ecran avec le son, pendant la duree choisie.
+- **Remplace la bande son d'une video** : le son ajoute prend la place du son
+  d'origine, ou s'y melange si tu remets le son d'origine. Cale-le en le
+  glissant dans la piste "Ajout" de la timeline.
+- **Plusieurs ecrans, un seul son** : un meme affiche sur plusieurs ecrans ne
+  joue plus son son en echo, une seule fois suffit.
 
-Deja dans la 0.4.0 : la colonne "qui est dans le vocal", la banque de memes
-dans l'editeur et les memes qui se calent dans les coins.
+Deja dans la 0.5.0 : partager tes videos dans la banque de memes. Dans la
+0.4.0 : la colonne "qui est dans le vocal", la banque de memes et les memes qui
+se calent dans les coins.
 
 Depuis la 0.1.0, l'installeur Windows et l'AppImage se mettent a jour tout
 seuls : redemarre l'app quand elle le propose.
