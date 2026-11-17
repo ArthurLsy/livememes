@@ -21,6 +21,8 @@ const { createPairingCode, redeemPairingCode } = await import('../src/store/devi
 const catalog = await import('../src/library/catalog.ts');
 type LibraryResponse = import('@livememes/shared').LibraryResponse;
 type LibraryAddResponse = import('@livememes/shared').LibraryAddResponse;
+type SoundsResponse = import('@livememes/shared').SoundsResponse;
+type SoundAddResponse = import('@livememes/shared').SoundAddResponse;
 const { LIBRARY_MAX_ADDS } = await import('../src/http/app.ts');
 
 let server: Server;
@@ -208,5 +210,99 @@ describe('ajout a la banque', () => {
     assert.deepEqual(statuses, [201, 201, 201, 201, 201]);
     const manifest = JSON.parse(fs.readFileSync(path.join(libraryDir, catalog.MANIFEST), 'utf8'));
     assert.equal(manifest.videos.length, 5);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Banque de sons (#35)                                                       */
+/* -------------------------------------------------------------------------- */
+
+/** Debut valide d'un mp3 : tag ID3. */
+const MP3 = Buffer.concat([Buffer.from('ID3'), Buffer.alloc(64, 2)]);
+/** Debut valide d'un .m4a : boite ftyp. */
+const M4A = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypM4A '), Buffer.alloc(64, 3)]);
+
+function writeSounds(sounds: unknown[]): void {
+  const file = path.join(libraryDir, catalog.SOUNDS.manifest);
+  fs.writeFileSync(file, JSON.stringify({ sounds }));
+  const later = new Date(Date.now() + Math.random() * 100_000);
+  fs.utimesSync(file, later, later);
+}
+
+const getSounds = (auth = token) => fetch(`${baseUrl}/api/sounds`, { headers: { authorization: `Bearer ${auth}` } });
+
+function addSound(query: string, body: Buffer = M4A, type = 'audio/mp4', auth = token) {
+  return fetch(`${baseUrl}/api/sounds?${query}`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${auth}`, 'content-type': type },
+    body,
+  });
+}
+
+describe('banque de sons', () => {
+  it('lit son propre catalogue, sans melanger avec les videos', async () => {
+    fs.writeFileSync(path.join(libraryDir, 'boom.mp3'), MP3);
+    writeCatalog([{ id: 'chat', title: 'Chat surpris', file: 'chat.mp4' }]);
+    writeSounds([
+      { id: 'boom', title: 'Vine boom', tags: ['Boom'], file: 'boom.mp3' },
+      { id: 'video', title: 'Pas un son', file: 'chat.mp4' },
+    ]);
+
+    assert.equal((await getSounds('inconnu')).status, 401);
+    const { sounds } = (await (await getSounds()).json()) as SoundsResponse;
+    assert.deepEqual(sounds, [
+      {
+        id: 'boom',
+        title: 'Vine boom',
+        tags: ['boom'],
+        url: 'https://memes.example/sounds/boom',
+        contentType: 'audio/mpeg',
+        bytes: MP3.length,
+      },
+    ]);
+    const { videos } = (await (await getLibrary()).json()) as LibraryResponse;
+    assert.deepEqual(videos.map((video) => video.id), ['chat']);
+
+    const file = await fetch(`${baseUrl}/sounds/boom`);
+    assert.equal(file.headers.get('content-type'), 'audio/mpeg');
+    assert.equal((await fetch(`${baseUrl}/sounds/chat`)).status, 404);
+  });
+
+  it('publie un son ajoute depuis l editeur', async () => {
+    writeSounds([]);
+    const response = await addSound(new URLSearchParams({ title: 'Rire enregistré', tags: 'rire' }).toString());
+    assert.equal(response.status, 201);
+    const { sound } = (await response.json()) as SoundAddResponse;
+    assert.match(sound.id, /^rire-enregistre-[0-9a-f]{6}$/);
+    assert.equal(sound.url, `https://memes.example/sounds/${sound.id}`);
+    assert.equal(sound.contentType, 'audio/mp4');
+
+    const listed = ((await (await getSounds()).json()) as SoundsResponse).sounds;
+    assert.deepEqual(listed.map((entry) => entry.id), [sound.id]);
+    const manifest = JSON.parse(fs.readFileSync(path.join(libraryDir, catalog.SOUNDS.manifest), 'utf8'));
+    assert.equal(manifest.sounds[0].addedBy, '400000000000000001');
+  });
+
+  it('refuse sans titre, hors son ou deguise', async () => {
+    const missing = await addSound('title=');
+    assert.equal(missing.status, 400);
+    assert.match(((await missing.json()) as { error: string }).error, /au son/);
+    assert.equal((await addSound('title=x', MP4, 'video/mp4')).status, 415);
+    assert.equal((await addSound('title=x', Buffer.from('RIFF....WAVE....'), 'audio/wav')).status, 415);
+    assert.equal((await addSound('title=x', Buffer.from('<html>pas un son</html>'), 'audio/mpeg')).status, 400);
+    assert.equal((await addSound('title=x', MP3, 'audio/mpeg')).status, 201);
+  });
+
+  it('refuse un son trop lourd', async () => {
+    writeSounds([]);
+    const big = Buffer.concat([MP3, Buffer.alloc(8 * 1024 * 1024)]);
+    // Le serveur repond 413 et ferme aussitot : selon le moment, le client voit
+    // la reponse ou une connexion coupee en plein envoi. Les deux sont un refus.
+    const status = await addSound('title=Trop long', big, 'audio/mpeg').then(
+      (response) => response.status,
+      () => 413,
+    );
+    assert.equal(status, 413);
+    assert.deepEqual(((await (await getSounds()).json()) as SoundsResponse).sounds, []);
   });
 });
