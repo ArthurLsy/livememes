@@ -5,6 +5,12 @@ depuis l'app, il s'affiche en plein ecran chez tous les membres de ton salon voc
 
 ## Nouveau dans cette version
 
+- **Correctif : la banque de memes defile** : les memes ne retrecissent plus
+  quand la banque se remplit, la liste defile normalement. Meme correctif
+  pour la banque de sons.
+
+Deja dans la 0.6.0 :
+
 - **Banque de sons** : dans l'editeur, pioche un son dans la banque (ecoute-le
   avant de choisir) ou importe le tien (mp3, m4a, wav, ogg, ou la bande son
   d'une video). Tu peux partager ton son dans la banque pour tout le monde.
