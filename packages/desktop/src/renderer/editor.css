@@ -339,6 +339,12 @@ button:disabled { opacity: 0.5; cursor: default; }
 .library__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  /* Les cartes ont overflow: hidden (taille mini 0) : sans max-content, les
+     lignes se compriment pour tenir dans la modale au lieu de defiler (#42). */
+  grid-auto-rows: max-content;
+  align-content: start;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 14px;
   overflow-y: auto;
   padding: 2px 2px 8px;
@@ -361,6 +367,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 
 .library__item video {
   display: block;
+  flex: none;
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
@@ -928,10 +935,15 @@ input[type='range'] {
 .sound-list {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 8px;
   overflow-y: auto;
   padding: 2px 2px 8px;
 }
+
+/* Meme piege que la banque de memes (#42) : les elements ne se compriment pas. */
+.sound-list > * { flex: none; }
 
 .sound-item {
   display: flex;
