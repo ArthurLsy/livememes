@@ -16,6 +16,36 @@ meme s'affiche sur les overlays, c'est le seul retour public. Quand une commande
 differe sa reponse, le flag se pose sur le `deferReply` — la visibilite est figee
 a ce moment-la et `editReply` ne peut plus la changer.
 
+## Livrer une feature ou un correctif : tout le circuit, sans rien demander
+
+Quand l'utilisateur decrit un bug ou une feature, Claude fait **tout** le circuit
+jusqu'au bout. L'utilisateur ne fait rien, a part installer la mise a jour sur son
+client. Ne pas s'arreter en route pour demander de publier, merger ou taguer.
+
+1. **Ticket** : `gh issue create` (titre + cause + correctif prevu).
+2. **Branche** : `fix/<n>-<sujet>` ou `feat/<n>-<sujet>` depuis `main` a jour.
+3. **Code** : le correctif, puis `npm run typecheck` et `npm test` si Node est
+   installe (sinon le dire). Commit avec `(#<n>)` dans le titre et `Fixes #<n>`
+   dans le corps.
+4. **Pull request** : `gh pr create`, attendre la CI (`gh pr checks --watch`),
+   puis `gh pr merge --merge --delete-branch`. Le push sur `main` declenche le
+   deploiement auto du **backend** sur Coolify.
+5. **Version** : branche `release/vX.Y.Z`, monter la version dans `package.json`,
+   `packages/desktop/package.json` et `package-lock.json` (3 occurrences), ajouter
+   le changement en tete de `.github/RELEASE_NOTES.md`, commit "Passe en X.Y.Z",
+   PR et merge comme a l'etape 4. Correctif = patch, feature = mineure.
+6. **Tag** : sur `main` a jour, `git tag vX.Y.Z` puis `git push origin vX.Y.Z`.
+   Le workflow `release` construit les binaires Windows/macOS/Linux (~5 min).
+7. **Publier** : un tag stable cree la release **en brouillon**, invisible pour
+   l'auto-update. Attendre la fin du workflow (`gh run watch <id> --exit-status`),
+   verifier les binaires (`gh release view vX.Y.Z`), puis
+   `gh release edit vX.Y.Z --draft=false --latest`.
+8. **Fin** : dire a l'utilisateur que la mise a jour est disponible dans l'app.
+
+Un changement de code desktop seul (renderer, overlay) n'a besoin que de la
+release : Coolify ne deploie que le backend. Un changement serveur a besoin de
+`main` (Coolify). Dans le doute, faire les deux, c'est le circuit par defaut.
+
 ## Commandes
 
 ```bash
